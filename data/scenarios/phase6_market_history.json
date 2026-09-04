@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "source": "synthetic_test_fixture",
+    "description": "Deterministic synthetic daily history for Phase 6 change-detection tests (relative performance, RVOL). NOT real market data — do not present as actual NIFTY or RELIANCE history.",
+    "not_real_market_data": true
+  },
+  "NIFTY50": [
+    {"date": "2026-08-15", "close": 24000}, {"date": "2026-08-16", "close": 24012},
+    {"date": "2026-08-17", "close": 24024}, {"date": "2026-08-18", "close": 24036},
+    {"date": "2026-08-19", "close": 24048}, {"date": "2026-08-20", "close": 24060},
+    {"date": "2026-08-21", "close": 24072}, {"date": "2026-08-22", "close": 24084},
+    {"date": "2026-08-23", "close": 24096}, {"date": "2026-08-24", "close": 24108},
+    {"date": "2026-08-25", "close": 24120}, {"date": "2026-08-26", "close": 24132},
+    {"date": "2026-08-27", "close": 24144}, {"date": "2026-08-28", "close": 24156},
+    {"date": "2026-08-29", "close": 24168}, {"date": "2026-08-30", "close": 24180},
+    {"date": "2026-08-31", "close": 24192}, {"date": "2026-09-01", "close": 24204},
+    {"date": "2026-09-02", "close": 24216}, {"date": "2026-09-03", "close": 24228},
+    {"date": "2026-09-04", "close": 24240}
+  ],
+  "RELIANCE.NS": [
+    {"date": "2026-08-15", "close": 1300.00, "volume": 10000000},
+    {"date": "2026-08-16", "close": 1303.25, "volume": 10000000},
+    {"date": "2026-08-17", "close": 1306.50, "volume": 10000000},
+    {"date": "2026-08-18", "close": 1309.75, "volume": 10000000},
+    {"date": "2026-08-19", "close": 1313.00, "volume": 10000000},
+    {"date": "2026-08-20", "close": 1316.25, "volume": 10000000},
+    {"date": "2026-08-21", "close": 1319.50, "volume": 10000000},
+    {"date": "2026-08-22", "close": 1322.75, "volume": 10000000},
+    {"date": "2026-08-23", "close": 1326.00, "volume": 10000000},
+    {"date": "2026-08-24", "close": 1329.25, "volume": 10000000},
+    {"date": "2026-08-25", "close": 1332.50, "volume": 10000000},
+    {"date": "2026-08-26", "close": 1335.75, "volume": 10000000},
+    {"date": "2026-08-27", "close": 1339.00, "volume": 10000000},
+    {"date": "2026-08-28", "close": 1342.25, "volume": 10000000},
+    {"date": "2026-08-29", "close": 1345.50, "volume": 10000000},
+    {"date": "2026-08-30", "close": 1348.75, "volume": 10000000},
+    {"date": "2026-08-31", "close": 1352.00, "volume": 10000000},
+    {"date": "2026-09-01", "close": 1355.25, "volume": 10000000},
+    {"date": "2026-09-02", "close": 1358.50, "volume": 10000000},
+    {"date": "2026-09-03", "close": 1361.75, "volume": 10000000},
+    {"date": "2026-09-04", "close": 1365.00, "volume": 25000000}
+  ]
+}
