@@ -466,3 +466,101 @@ scoring entirely (section 4 rule 2), never silently scored as FRESH or STALE. Th
 consistent with BUILD_ROADMAP.md's rule to never silently convert NULL into a zero *value*:
 UNAVAILABLE is the existing frozen "no usable value at all" category, not an invented
 default — a NULL snapshot honestly has no known freshness, so it belongs there.
+
+## Decision 16: ChangeEvent → MarketEvent Persistence Contract (Option A)
+
+**Status:** APPROVED
+
+### Context
+
+Phase 6's `detect_change()` produces the canonical in-memory `ChangeEvent`.
+The Phase 5 ingestion path still uses the older `detect_price_move()`
+placeholder and writes `MarketEvent` rows directly, bypassing the tested
+Phase 6 detectors entirely. This decision closes that gap.
+
+### Core principle: scoring is read-time, not ingestion-time
+
+`intelligence.score_event()` requires an `Objective` (GROWTH/VALUE/
+STABILITY). `MarketEvent` is a single row keyed by instrument_id, not
+scoped to any one watchlist — the same instrument can sit in multiple
+watchlists with different objectives simultaneously. Baking one
+objective's `attention_tier` into `MarketEvent.importance` at ingestion
+time would silently apply one watchlist's answer to every watchlist
+watching that instrument, contradicting Decisions 1-7 (relevance is
+objective-dependent).
+
+Therefore:
+
+- `MarketEvent` = the raw historical fact of what happened. Persisted
+  once, at ingestion time, objective-agnostic.
+- `relevance` / `magnitude_normalized` / `data_confidence` /
+  `composite_score` / `attention_tier` = computed at READ time, per
+  request, against the specific watchlist's `objective`. Never persisted.
+
+### MarketEvent.importance is a coarse severity label, NOT an attention tier
+
+`MarketEvent.importance` is derived from `magnitude_normalized` alone
+(via `compute_magnitude()`), with no relevance/objective/confidence
+weighting applied. It exists for coarse ops/log triage only ("was this a
+big move") and must never be read by Phase 7.2/7.3 as a substitute for
+`score_event()`'s real, per-objective `attention_tier`. Any event type
+`compute_magnitude()` doesn't yet cover (NotScoreable) gets `importance =
+"LOW"` by default — a deliberate under-estimate, never a fabricated HIGH.
+
+### Field Mapping
+
+| ChangeEvent | MarketEvent |
+|---|---|
+| `instrument_id` | `instrument_id` |
+| `event_type` | `event_type` |
+| — (see above) | `importance` — derived from magnitude alone, not copied from `ChangeEvent.importance` (which defaults to LOW and is never set by any detector today) |
+| `detected_at` | `timestamp` |
+| `reason` | `details["reason"]` |
+| `previous_value` | `details["previous_value"]` (str) |
+| `current_value` | `details["current_value"]` (str) |
+| `delta` | `details["delta"]` (str) |
+| `baseline_timestamp` | `details["baseline_timestamp"]` (ISO string or null) |
+| `details` (event-specific, e.g. `is_full_window`, `metric_family`) | merged into `details` |
+| N/A | `title` — simple machine-oriented string, human templating is Phase 7.3 |
+| N/A | `source` — supplied by ingestion caller |
+| N/A | `data_quality` — the observation's data_quality at event-detection time (Decision 15) |
+
+### Details collision rule
+
+`details` = `dict(event.details)` (event-specific fields first), then the
+five canonical fields (`previous_value`, `current_value`, `delta`,
+`reason`, `baseline_timestamp`) are written on top. Canonical fields win
+on any key collision. No guessing, no reconstruction.
+
+### Decimal / datetime serialization
+
+`Decimal` → `str()`. `baseline_timestamp` (datetime) → `.isoformat()` or
+`None`. This happens only inside the conversion function — no Decimal or
+raw datetime ever reaches the JSONB boundary.
+
+### Legacy rows (Option A: exclude)
+
+Existing Phase 5 rows (created by the old `detect_price_move()`
+placeholder path) lack the full Phase 6 `details` contract and carry a
+hardcoded `importance="MEDIUM"` that was never derived from real
+magnitude. They are NOT reverse-engineered or migrated. They are excluded
+from Phase 7 intelligence/last-visit scoring entirely — consistent with
+Decision 15's "no usable historical state → don't manufacture one" rule.
+They remain visible only in a raw, unscored event log if the product
+wants that (same carve-out Decision 15 gives UNAVAILABLE events).
+
+### Transition
+
+The old `detect_price_move()` placeholder in `ingestion.py` is NOT
+deleted in this change — `ingest_observation()`'s call site is switched to
+the real `detect_change()` pipeline, but the placeholder function stays
+in the file, unused, until the new path is verified end-to-end against a
+live database.
+
+### Consequence
+
+1. `detect_change()` becomes part of the real ingestion pipeline.
+2. Every newly persisted `MarketEvent` follows one documented, versionable contract.
+3. `score_event()` is called once per (event, watchlist) pair at GET time — never at ingestion time.
+4. Phase 7.2's `last_visit.py` needs no `MarketEvent → ChangeEvent` guessing: the conversion happens once, correctly, at the ingestion boundary in reverse (see `event_persistence.py`).
+5. Legacy Phase 5 rows are explicitly and permanently excluded from scoring, not silently misinterpreted.

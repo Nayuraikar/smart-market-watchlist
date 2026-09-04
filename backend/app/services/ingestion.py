@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Instrument, MarketState, MarketHistory, MarketEvent
 from app.schemas.market import MarketObservation
+from app.services.change_detection import detect_change
+from app.services.event_persistence import change_event_to_market_event
 
 DEFAULT_STALE_THRESHOLD_SECONDS = int(os.environ.get("MARKET_STALE_THRESHOLD_SECONDS", "120"))
 PRICE_MOVE_THRESHOLD_PCT = Decimal("2.0")  # deliberate default — see DECISIONS.md
@@ -111,10 +113,25 @@ async def ingest_observation(
     if stored_state is not None and incoming_sequence <= stored_state.ingestion_version:
         return IngestOutcome(result=IngestResult.REJECTED_OUT_OF_SEQUENCE)
 
-    # 7. persist — one atomic transaction: state + history + event (if triggered), or none of it
+    # 7. persist — one atomic transaction: state + history + event(s) (if triggered), or none of it
     previous_price = stored_state.price if stored_state is not None else None
     is_first_observation = stored_state is None
-    event_fired = (not is_first_observation) and detect_price_move(previous_price, obs.price)
+
+    # Decision 16 — real Phase 6 detector replaces the Phase 5 placeholder
+    # at this call site. Only PRICE_MOVE is wired here: RELATIVE_OUTPERFORMANCE
+    # (needs a benchmark observation), VOLUME_SURGE (needs trailing volumes),
+    # and 52W_HIGH/LOW (needs trailing prices) require querying MarketHistory
+    # and are deliberately out of scope for this pass — not silently skipped,
+    # just not yet wired (tracked as Phase 7.2b).
+    change_events = []
+    if not is_first_observation:
+        change_events = detect_change(
+            instrument_id=str(instrument.id),
+            previous_price=previous_price,
+            current_price=obs.price,
+            detected_at=obs.observed_at,
+        )
+    event_fired = len(change_events) > 0
 
     if stored_state is None:
         stored_state = MarketState(instrument_id=instrument.id)
@@ -141,17 +158,12 @@ async def ingest_observation(
         timestamp=obs.observed_at,
     ))
 
-    if event_fired:
-        pct = (obs.price - previous_price) / previous_price * 100
-        db.add(MarketEvent(
-            instrument_id=instrument.id,
-            event_type="PRICE_MOVE",
-            importance="MEDIUM",  # placeholder — Phase 6's attention engine supersedes this
-            timestamp=obs.observed_at,
-            title=f"{obs.ticker} moved {pct:.2f}%",
-            details={"previous_price": str(previous_price), "new_price": str(obs.price)},
-            source=obs.source,
+    for change_event in change_events:
+        db.add(change_event_to_market_event(
+            change_event,
+            ticker=obs.ticker,
             data_quality=data_quality,  # Decision 15 — event-time snapshot, same transaction
+            source=obs.source,
         ))
 
     await db.commit()
