@@ -117,3 +117,36 @@ rather than preventing the core instrument universe from being created.
   record price enters tomorrow's window, a flat plateau at the new
   high/low never re-fires on its own — no separate "already notified"
   tracking is needed.
+
+### Phase 6.7: scoring metric sourcing decisions
+
+- "Earnings growth" in GROWTH is frozen as FundamentalSnapshot.eps_growth
+  (per-share), not profit_growth (total profit) — the two are different
+  metrics and the model name was ambiguous until now.
+- P/E ratio (VALUE) is sourced from MarketObservation.pe_ratio, a
+  cross-table read at the scoring-input-preparation layer. The three
+  score functions themselves remain agnostic to source tables — they
+  consume only a dict of already-computed percentiles.
+- FCF yield (VALUE) is not a stored column anywhere. It is derived as
+  free_cash_flow / market_cap in the scoring-input-prep layer, joining
+  FundamentalSnapshot and MarketObservation, before being fed into the
+  percentile step alongside every other metric.
+- P/B ratio (VALUE) is permanently unavailable, not approximated. Book
+  equity is not directly stored; FundamentalSnapshot.roe is an
+  already-computed profit/equity ratio, and back-deriving equity from
+  it would combine two lossy numbers on a possibly-inconsistent equity
+  basis. Rather than invent that proxy, P/B is treated as a missing
+  metric for every instrument, every time, and renormalizes away under
+  the existing >=60% coverage rule exactly like any other missing value.
+- Earnings volatility (STABILITY) is deferred. It is not a snapshot
+  column but a statistic (e.g. rolling stddev of eps or profit_growth
+  across historical FundamentalSnapshot rows for one instrument), and
+  no such time-series methodology has been defined or built yet. It is
+  always treated as missing for now. STABILITY therefore always scores
+  off Debt/Equity + ROE alone (40+30 = 70% of total weight, renormalized
+  to 100%), which stays above the 60% floor without changing the frozen
+  weights.
+- No migration was added solely to colocate scoring metrics onto one
+  table. Cross-table joins happen once, at the scoring-input-prep step,
+  which already has to touch both tables per instrument to compute
+  percentiles anyway.
