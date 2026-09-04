@@ -57,3 +57,24 @@ whether its numerator is a TTM-quarterly sum or a single annual figure.
 fcf_yield_basis (TTM_QUARTERLY / ANNUAL) makes this explicit so
 cross-instrument ranking doesn't silently mix definitions.
 
+
+## Instrument universe remains intentionally scoped
+
+The initial instrument universe is scoped to the NIFTY 50 plus a small
+number of additional representative NSE equities rather than the full
+NSE/BSE listing.
+
+Broader coverage would require a verified, current, and appropriately
+licensed instrument-universe source. No such source was established within
+the build window, and universe size is not a product requirement.
+
+Decision: Phase 3.6 seeds the initial 53 instruments only. The architecture
+does not assume this is the permanent universe: instruments are stored
+independently by canonical provider ticker, so broader coverage can be
+added later without a schema change.
+
+Sector and industry metadata are best-effort enrichment and do not block
+instrument seeding. yfinance Ticker.info is currently rate-limited by
+Yahoo quoteSummary, while market history remains available through the
+history endpoint. Metadata failures therefore leave sector/industry NULL
+rather than preventing the core instrument universe from being created.
