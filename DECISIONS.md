@@ -177,3 +177,193 @@ rather than preventing the core instrument universe from being created.
   percentile was expected) — it is not the same class of problem as a
   genuinely missing metric, so it must not be silently treated as
   INSUFFICIENT_DATA.
+
+### Phase 6.8: Relevance/attention spec — Decision 1 (FUNDAMENTAL_CHANGE sub-typing)
+
+FUNDAMENTAL_CHANGE remains a single locked event_type in EVENT_TYPES — not expanded into
+per-metric subtypes. Which fundamental metric changed is carried in ChangeEvent.details,
+which for this event_type must contain "metric" (str), "metric_family" (one of "growth" /
+"value" / "stability"), "previous", "current", "delta" (all numeric | None). "metric" and
+"metric_family" are mandatory and a missing or invalid value raises rather than defaulting.
+delta_pct is deliberately not required — delta units are metric-specific (percentage-point
+for growth-rate metrics, to handle zero-crossings correctly; plain numeric for ratio metrics).
+Relevance lookup for this event_type is two-step: event_type -> details["metric_family"] ->
+objective, not a flat event_type -> objective lookup like the other event types. Binds any
+future FUNDAMENTAL_CHANGE detector to populate these fields from the start. See
+RELEVANCE_ATTENTION_SPEC.md section 2b for the full frozen contract.
+
+### Phase 6.8: Relevance/attention spec — Decision 2 (CORPORATE_ACTION sub-typing)
+
+CORPORATE_ACTION remains a single locked event_type in EVENT_TYPES. Sub-typing lives in
+ChangeEvent.details via two mandatory fields: "economic_effect" (one of
+shareholder_friendly / shareholder_dilutive / cosmetic / structural — drives relevance
+scoring) and "action_type" (free-text, e.g. "buyback", "stock_split" — used only for
+human-facing explanations/UI, not for scoring). Missing or invalid values in either field
+raise rather than defaulting. Relevance lookup is event_type -> details["economic_effect"]
+-> objective, mirroring the pattern frozen for FUNDAMENTAL_CHANGE in Decision 1.
+
+structural (merger/acquisition) is deliberately NOT assigned a relevance row or run through
+the composite_score formula at this time — a merger isn't mechanically comparable to a
+dividend or split, and forcing it through magnitude x relevance x confidence would produce
+a number with false precision. It should surface to the user via a raw event log without a
+scored attention_tier until dedicated handling is designed against real detector inputs.
+See RELEVANCE_ATTENTION_SPEC.md section 2c for the full frozen contract.
+
+### Phase 6.8: Relevance/attention spec — Decision 3 (PRICE_MOVE directionality)
+
+PRICE_MOVE relevance is direction-dependent for STABILITY only: downward moves score HIGH,
+upward moves score MEDIUM. GROWTH and VALUE remain direction-agnostic at MEDIUM regardless
+of sign. Rationale: downside risk and upside movement are not symmetric for a stability
+objective (standard in finance — max drawdown, downside deviation, Sortino ratio all exist
+for this reason), whereas extending asymmetry to GROWTH/VALUE would duplicate signal already
+carried more precisely by 52W_HIGH/52W_LOW and RELATIVE_OUTPERFORMANCE.
+
+Direction is read exclusively from the numeric sign of ChangeEvent.delta. The relevance/
+attention engine must never parse or depend on the human-readable "reason" string for this —
+reason is for display only, delta is the sole authoritative source, and the two must not be
+allowed to silently drift apart. The existing 2.0% PRICE_MOVE_THRESHOLD_PCT firing threshold
+is unchanged; this decision affects only the relevance lookup, not detection, so no changes
+to change_detection.py are required.
+
+This is the only direction-sensitive relevance rule in the spec. No other event type gains
+direction-dependent relevance without its own separate, explicitly approved decision.
+See RELEVANCE_ATTENTION_SPEC.md section 2d for the full frozen contract.
+
+### Phase 6.8: Relevance/attention spec — Decision 4 (52W_HIGH/52W_LOW magnitude)
+
+The earlier proposal to score 52W_HIGH/52W_LOW magnitude via a continuous formula
+(magnitude_normalized = clamp(0.4 + 0.6 * pct_beyond_prior_extreme / 5.0, 0.4, 1.0)) is
+REJECTED on review as false precision. detect_52w_high/detect_52w_low have no firing
+threshold by design — any breakout at all fires — and the formula's "5%" ceiling was an
+invented round number with no grounding, producing a five-decimal composite_score that
+implied a measurement that was never actually made.
+
+52W_HIGH/52W_LOW magnitude is instead categorical, keyed off the detector's own
+is_full_window flag (already present in ChangeEvent.details, already meaningful by the
+detector's own design — it reflects how much trailing history backs the "52-week" claim):
+is_full_window == True -> magnitude_normalized = 1.0; is_full_window == False -> 0.7. The
+0.7 discount is explicitly labeled as a flat, undereived choice, not a computed value.
+
+The real breakout size (prior_max/prior_min, current_price) remains in details and continues
+to feed the human-facing explanation text — it is simply excluded from composite_score.
+Scoring and explanation are treated as separate consumers of the same event.
+
+See RELEVANCE_ATTENTION_SPEC.md section 3a for the full frozen treatment.
+
+### Phase 6.8: Relevance/attention spec — Decision 5 (multiple simultaneous events)
+
+Multiple events firing on one instrument at the same observation (e.g. PRICE_MOVE + 52W_HIGH,
+explicitly possible per detect_change()'s own docstring) combine via max-of-independent-scores,
+never summed. This structurally cannot double-count: max() of two numbers is definitionally
+not their sum, so no co-occurrence bonus is applied. The event producing the max composite_score
+becomes the instrument's "top event tag"; all other concurrent events remain fully retrievable
+on drill-in.
+
+Ties in composite_score resolve via a fully deterministic chain: composite_score ->
+relevance_weight -> magnitude_normalized -> EVENT_TYPE_PRIORITY. EVENT_TYPE_PRIORITY is a new,
+explicitly-frozen ordering (52W_HIGH, 52W_LOW, RELATIVE_OUTPERFORMANCE, EARNINGS,
+FUNDAMENTAL_CHANGE, CORPORATE_ACTION, VOLUME_SURGE, PRICE_MOVE, OTHER) — deliberately separate
+from EVENT_TYPES' declaration order in change_event.py, which exists only for enum readability
+and was never meant to carry tie-break semantics. Rationale: events with built-in historical/
+comparative context (52W breakouts, relative-benchmark divergence) rank above single-observation
+signals (PRICE_MOVE, VOLUME_SURGE); this is stated as a reasonable default, not a derived fact.
+
+Whether/how to phrase correlated co-fired events as one combined explanation narrative (vs.
+separate blocks that could read as "two independent reasons") is explicitly deferred to
+Decision 7, since it depends on the explanation contract's actual field structure, not yet
+frozen. See RELEVANCE_ATTENTION_SPEC.md section 5/5a/5b/5c for the full frozen contract.
+
+### Phase 6.8: Relevance/attention spec — Decision 6 (stale/unavailable data -> confidence)
+
+The originally-drafted 4-tier confidence scheme (1.0/0.6/0.3/0.0 with a "5x stale threshold"
+grace-window boundary) is rejected — the "5x" multiplier was an ungrounded round number, the
+same category of false precision already rejected for 52W_HIGH/52W_LOW magnitude in Decision 4.
+
+FRESH / STALE / UNAVAILABLE are now the canonical data-quality states, used by both the
+scoring layer and the explanation layer (section 7). data_confidence is a separate, derived
+scoring input computed from that state, not the state itself: FRESH -> 1.0, STALE -> 0.5,
+UNAVAILABLE -> 0.0 (event suppressed entirely — no composite_score or attention_tier is
+computed). The 0.5 value for STALE is explicitly a product-policy discount that halves a
+stale event's contribution to scoring — it is not a statistically derived confidence figure
+and must never be surfaced to the user as "50% confidence" or similar framing.
+
+Explanation-layer requirement (binding on the not-yet-designed Decision 7 explanation
+contract): FRESH events are stated normally; STALE events must explicitly disclose that the
+underlying market data is stale/last-known, in plain language, not as a percentage; UNAVAILABLE
+data must not generate an attention explanation at all — it should surface a data-status
+message instead. See RELEVANCE_ATTENTION_SPEC.md section 6/6a/6b for the full frozen contract.
+
+### Phase 6.8: Relevance/attention spec — Decision 7 (explanation contract, FINAL)
+
+The explanation contract is frozen at 8 fields: what_happened, magnitude,
+benchmark_comparison (populated ONLY for RELATIVE_OUTPERFORMANCE - PRICE_MOVE and all
+other event types always return null; kept separate from magnitude, not merged), objective_relevance,
+data_status, data_confidence, attention_tier, composite_score.
+
+data_status is a structured object { state: FRESH|STALE|UNAVAILABLE, message: string|null },
+distinct from data_confidence (the internal-only numeric 1.0/0.5/0.0 from Decision 6).
+data_confidence must never be rendered to the user or exposed as a percentage; data_status
+carries the entire user-facing trust signal. FRESH allows message: null. STALE requires a
+plain-language stale/last-known disclosure. UNAVAILABLE requires a data-status message and
+explicitly produces no scored explanation at all — no what_happened, objective_relevance,
+attention_tier, or composite_score is generated for a suppressed event.
+
+Co-fired correlated events (PRICE_MOVE + 52W_HIGH, per Decision 5 section 5c) produce one
+combined what_happened narrative; the underlying ChangeEvents remain separately stored and
+retrievable — only the narrative text is merged, not the underlying data.
+
+This closes the seven designated Decision 1-7 reviews. It does NOT close the spec: two pre-existing section 8 product questions (meaningful-change count scope, and the 0.60/0.30 attention thresholds) remain explicitly open and must be resolved before Phase 6.8 implementation begins. See RELEVANCE_ATTENTION_SPEC.md section 7 for the full explanation contract.
+
+### Phase 6.8: Known open items NOT covered by Decisions 1-7
+
+Two items from the original section 8 ambiguity list were never part of the "Decision 1-7"
+review and remain genuinely unresolved:
+  - Per-objective vs. global attention count (does the Phase 8 dashboard's "N meaningful
+    changes" figure change when the user toggles GROWTH/VALUE/STABILITY, or stay constant
+    with only per-objective tiers changing on drill-in?)
+  - The 0.60/0.30 composite_score thresholds (section 4) were chosen as round numbers, not
+    derived, and were never revisited against real magnitude/relevance/confidence values the
+    way the 52W formula and stale-data grace window were in Decisions 4 and 6.
+These should be treated as open before Phase 6.8 implementation begins, not silently assumed
+resolved by the Decision 1-7 pass.
+
+### Phase 6.8: Relevance/attention spec — Decision A (meaningful-change count "N")
+
+N ("N meaningful changes since last visit") is computed per the currently selected
+objective, not globally: N = count of eligible (non-suppressed) events at ANY attention
+tier under that objective's relevance rules — LOW and MEDIUM events count too, not just
+HIGH. Switching objectives may change N, since eligibility is objective-dependent, mirroring
+how attention_tier itself already varies by objective.
+
+N counts events, not instruments: a single instrument co-firing PRICE_MOVE + 52W_HIGH at
+one observation contributes 2 to N, even though section 5 collapses those to a single
+"top event tag" for display on that instrument's card. This is intentional — N describes
+"how much changed," not "how many instruments changed."
+
+UNAVAILABLE (suppressed, data_confidence == 0) events never count toward N under any
+objective. See RELEVANCE_ATTENTION_SPEC.md section 9 for the full frozen contract.
+
+### Phase 6.8: Relevance/attention spec — Decision B (0.60/0.30 threshold validation)
+
+The 0.60/0.30 composite_score thresholds were originally an unexamined round-number
+proposal, honestly flagged as such in section 8 rather than silently assumed correct — the
+same standard applied to the 52W magnitude formula (Decision 4) and the stale-data grace
+window (Decision 6). Unlike those two, which were rejected for inventing an ungrounded
+curve that implied a measurement never actually made, 0.60/0.30 are not measurements — they
+partition the already-defined composite_score space into three tiers, and checking them
+against the real frozen formula (magnitude_normalized x relevance_weight x data_confidence)
+shows the partition is coherent:
+
+  - LOW-relevance events can never reach HIGH tier (ceiling 0.30 == MEDIUM's floor)
+  - STALE-confidence events can never reach HIGH tier (ceiling 0.50 < HIGH's floor 0.60)
+  - MEDIUM-relevance events reach HIGH only at near-maximum magnitude
+  - HIGH-relevance + FRESH events can cross into HIGH relatively early (magnitude~=0.6,
+    raw value ~1.4x the firing threshold) — explicitly accepted as an intended sensitivity
+    property (e.g. for STABILITY's downside-risk relevance rule from Decision 3), not an
+    overlooked side effect
+
+0.60/0.30 are kept as originally proposed. This closes the final two section 8 items.
+See RELEVANCE_ATTENTION_SPEC.md section 4a for the full derivation and DECISIONS.md /
+RELEVANCE_ATTENTION_SPEC.md section 9 for Decision A. All eight decisions plus both
+originally-open section 8 items are now resolved — Phase 6.8 implementation may begin
+once a final consistency pass over both files is done.
