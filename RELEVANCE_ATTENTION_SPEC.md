@@ -79,17 +79,39 @@ composite_score = magnitude_normalized x relevance_weight x data_confidence
 
 composite_score is in [0, 1].
 
-### 3a. Magnitude normalization - needs your existing thresholds, not new ones
+### 3a. Magnitude normalization (CONFIRMED thresholds, proposed curve - needs sign-off)
 
-I don't have change_detection.py's actual firing thresholds in front of me, so I have NOT
-invented magnitude curves here. Proposal: reuse whatever threshold already causes each event to
-be *detected* in Phase 6.1-6.6 as the magnitude_normalized = 0.5 midpoint, and pick one
-multiple of it (e.g. 3x) as the = 1.0 ceiling, clamped. Concretely, for each event type, I need
-you to confirm (or paste) the existing detection threshold before I write the normalization
-table - otherwise I'll be freezing numbers that silently disagree with code you've already
-shipped and tested.
+Real thresholds pulled directly from change_detection.py on 2026-09-05:
+  PRICE_MOVE_THRESHOLD_PCT = 2.0
+  RELATIVE_OUTPERFORMANCE_THRESHOLD_PCT = 3.0
+  RVOL_THRESHOLD = 2.0
+  52W_HIGH / 52W_LOW: no magnitude threshold - any breakout fires (see caveat below)
 
----
+General formula for threshold-gated events (PRICE_MOVE, RELATIVE_OUTPERFORMANCE, VOLUME_SURGE):
+the value that just barely fires the detector maps to magnitude_normalized = 0.5 (an event
+that didn't clear its own bar never reaches this code path at all, so 0.5 is the true floor,
+not an arbitrary starting point). 3x the firing threshold maps to 1.0, clamped above that.
+
+  magnitude_normalized = clamp(0.5 + 0.5 * (raw - threshold) / (2 * threshold), 0.5, 1.0)
+
+Concretely:
+  PRICE_MOVE:              raw = abs(pct_change).      threshold=2.0,  ceiling=6.0
+  RELATIVE_OUTPERFORMANCE: raw = abs(relative_pp).      threshold=3.0,  ceiling=9.0
+  VOLUME_SURGE:             raw = ratio (current/avg).   threshold=2.0,  ceiling=6.0 (i.e. 6x avg)
+
+52W_HIGH / 52W_LOW - NO firing threshold exists to anchor the same formula, since any
+breakout at all fires. Proposed fallback (needs explicit approval, not inferred from your
+code): use pct beyond the prior extreme instead -
+  raw = abs(current_price - prior_max_or_min) / prior_max_or_min * 100
+  magnitude_normalized = clamp(0.4 + 0.6 * raw / 5.0, 0.4, 1.0)
+  (a breakout of 0% above the prior high floors at 0.4, not 0.5, since it never failed a
+  bar the way the other detectors did; 5% beyond the prior extreme maps to 1.0.)
+This 0.4/5.0 choice is a guess, not derived from anything you have specified - flag if you
+want different numbers.
+
+EARNINGS / FUNDAMENTAL_CHANGE / CORPORATE_ACTION - no detector function exists yet in
+change_detection.py, so no magnitude curve can be written for these until 6.9/6.10 (or
+wherever they land) implement the actual detection logic and its own threshold.
 
 ## 4. Thresholds and precedence
 
