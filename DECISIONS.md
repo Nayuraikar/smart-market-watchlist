@@ -150,3 +150,30 @@ rather than preventing the core instrument universe from being created.
   table. Cross-table joins happen once, at the scoring-input-prep step,
   which already has to touch both tables per instrument to compute
   percentiles anyway.
+
+### Phase 6.7 correction round (pre-commit review caught these before merge)
+
+- Percentile convention was initially implemented ad hoc (midrank over
+  n, max value -> ~83.3 not 100) before being frozen in SCORING_MODEL.md.
+  Corrected to an endpoint-anchored rank formula (100 x (avg_rank-1)/(n-1))
+  so the observed lowest/highest map to exactly 0/100, matching what a
+  "0-100 score" should mean to someone reading the UI. Frozen in
+  SCORING_MODEL.md BEFORE the implementation was corrected, not after.
+- compute_fcf_yield() initially returned a raw ratio (0.1 for a 10%
+  yield). Corrected to return a percentage (x100) to stay consistent
+  with every other percentage-style metric in the system
+  (revenue_growth, eps_growth, price-move pct_change, etc).
+- RELATIVE_OUTPERFORMANCE (event type, frozen since Phase 1/6.4) is
+  intentionally bidirectional: a negative delta means underperformance,
+  not a data error and not a naming bug. The event type name is frozen
+  and is not being split into separate OUTPERFORMANCE/UNDERPERFORMANCE
+  types. `reason` already disambiguates direction per-event
+  (relative_outperform_Xpp vs relative_underperform_Xpp) and `delta`'s
+  sign is the authoritative signal for any caller.
+- Score functions now validate that every provided percentile lies in
+  [0, 100] and raise ValueError otherwise. An out-of-range percentile
+  indicates a caller/data-contract bug upstream (e.g. percentile
+  computation itself broken, or a raw value passed in where a
+  percentile was expected) — it is not the same class of problem as a
+  genuinely missing metric, so it must not be silently treated as
+  INSUFFICIENT_DATA.
