@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Locked in PRODUCT_SPEC.md Phase 1 — do not add a 10th type mid-build.
 EVENT_TYPES = (
@@ -39,5 +39,4 @@ class ChangeEvent(BaseModel):
     reason: str  # short machine-oriented label, e.g. "price_moved_2pct"
     details: dict[str, Any] = Field(default_factory=dict)  # human-facing explanation inputs, filled in by 6.13
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
