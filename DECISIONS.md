@@ -367,3 +367,59 @@ See RELEVANCE_ATTENTION_SPEC.md section 4a for the full derivation and DECISIONS
 RELEVANCE_ATTENTION_SPEC.md section 9 for Decision A. All eight decisions plus both
 originally-open section 8 items are now resolved — Phase 6.8 implementation may begin
 once a final consistency pass over both files is done.
+
+## Phase 7 — Last-Visit Engine Decisions
+
+### Decision 9 — First-visit behavior
+
+A first visit with no prior `last_viewed_at` baseline may still surface
+currently eligible change events in `since_last_visit`.
+
+Rationale: the absence of a user-specific historical baseline should not
+suppress real, currently relevant market events. The first visit should
+demonstrate the watchlist's change-awareness rather than appear artificially
+empty.
+
+---
+
+### Decision 10 — Newly added stocks
+
+A newly added stock does not generate a new change-event type solely because
+it was added to the watchlist.
+
+The stock appears in `instruments[]` with its `added_at` timestamp. It appears
+in `since_last_visit` only when it has an independently eligible market-change
+event.
+
+Rationale: this preserves the Phase 6 event taxonomy and avoids introducing
+a watchlist-management event solely for presentation purposes.
+
+---
+
+### Decision 11 — Invalid objective parameter
+
+An invalid `?objective=` value returns HTTP 400 rather than silently falling
+back to the watchlist's default objective.
+
+Rationale: an explicitly requested objective must either be honored or fail
+clearly. Silent fallback could cause the API to return relevance, attention,
+and `N` values for a different objective than the client requested.
+
+---
+
+### Decision 12 — POST /viewed response loss
+
+`POST /watchlists/{id}/viewed` is the authoritative mutation of
+`last_viewed_at`. If the server successfully performs the mutation but the
+client does not receive the response, the server-side state remains
+authoritative.
+
+The client must not advance its own baseline solely because it sent the
+request.
+
+Rationale: this avoids the more dangerous failure mode in which client state
+claims that changes have been consumed when the server never recorded the
+view. A lost successful response may result in a subsequent request treating
+the same baseline as already viewed, which is an accepted tradeoff.
+
+---
