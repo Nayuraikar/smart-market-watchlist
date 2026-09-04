@@ -1,17 +1,3 @@
-
----
-
-# 3. DATA_SPEC.md
-
-This one looks scary, but it's basically:
-
-> **"What boxes are we putting into our database?"**
-
-We're going to make this concrete.
-
-Put this into `DATA_SPEC.md`:
-
-```markdown
 # Data Spec
 
 This document defines the persistent data model for the Smart Market
@@ -71,7 +57,7 @@ instrument can be referenced by many users.
 | field | type | nullable | constraints | meaning | source |
 |---|---|---|---|---|---|
 | id | UUID | no | PRIMARY KEY | internal instrument identifier | generated |
-| ticker | VARCHAR(30) | no | UNIQUE | market ticker such as RELIANCE | provider |
+| ticker | VARCHAR(30) | no | UNIQUE | provider's full ticker symbol including exchange suffix — e.g. `RELIANCE.NS`, `TCS.NS` — not the bare display name. If the UI wants to show `RELIANCE`, derive that at render time; the stored ticker is the canonical, unambiguous provider identifier | provider |
 | name | VARCHAR(255) | no | | company name | provider |
 | exchange | VARCHAR(20) | no | | NSE/BSE | provider |
 | instrument_type | VARCHAR(20) | no | | EQUITY initially; future-compatible | provider |
@@ -133,7 +119,7 @@ This table represents the current known state.
 | dividend_yield | NUMERIC(12,4) | yes | | latest dividend yield if available | provider |
 | observed_at | TIMESTAMPTZ | no | | time represented by observation | provider |
 | received_at | TIMESTAMPTZ | no | | time application received data | generated |
-| sequence | BIGINT | no | | ordering/version for observations | provider/app |
+| ingestion_version | BIGINT | no | | application-generated monotonic counter per instrument — yfinance provides no provider-side sequence number, so this cannot be sourced from the provider | app |
 | data_quality | VARCHAR(20) | no | | FRESH/STALE/UNAVAILABLE | app |
 | source | VARCHAR(100) | no | | provider identifier | app |
 
@@ -153,9 +139,12 @@ technical calculations.
 |---|---|---|---|---|---|
 | id | BIGSERIAL | no | PRIMARY KEY | history row | generated |
 | instrument_id | UUID | no | FK → instruments.id | instrument | app |
-| price | NUMERIC(18,4) | no | CHECK > 0 | historical price | provider |
+| open_price | NUMERIC(18,4) | no | CHECK > 0 | session open price | provider |
+| high_price | NUMERIC(18,4) | no | CHECK > 0 | session high price | provider |
+| low_price | NUMERIC(18,4) | no | CHECK > 0 | session low price | provider |
+| close_price | NUMERIC(18,4) | no | CHECK > 0 | session close price | provider |
 | volume | NUMERIC(24,4) | no | CHECK >= 0 | historical volume | provider |
-| timestamp | TIMESTAMPTZ | no | | observation time | provider |
+| timestamp | TIMESTAMPTZ | no | | trading session date this OHLC bar represents (daily granularity, per `ticker.history()`) | provider |
 
 Indexes:
 
@@ -175,32 +164,51 @@ This supports historical lookups such as:
 
 Stores fundamental metrics that change less frequently than market prices.
 
+**This table stores rows of two different cadences**, distinguished by
+`period_type`:
+
+- `QUARTERLY` rows populate every column *except* `free_cash_flow`
+  (yfinance provides no quarterly cash flow statement for this ticker —
+  confirmed empty DataFrame, `shape: (0, 0)`, see Field Derivation Map).
+- `ANNUAL` rows populate *only* `free_cash_flow`; every other column is
+  NULL on an annual row. Annual rows are not a restatement of the
+  quarterly fields — do not populate revenue/eps/roe/etc. on an annual
+  row, that would create two disagreeing sources of truth for the same
+  metric (summed-from-quarters vs. officially-reported-annual).
+
+**Consumers must filter by `period_type` when querying this table.**
+`ORDER BY snapshot_at DESC LIMIT 1` without a `period_type` filter is not
+safe — it can return the FCF-only annual row instead of the fully
+populated quarterly row, depending on which was inserted more recently.
+
 | field | type | nullable | meaning | source |
 |---|---|---|---|---|
 | id | BIGSERIAL | no | snapshot identifier | generated |
 | instrument_id | UUID | no | related instrument | app |
-| period | VARCHAR(30) | no | reporting period | provider |
-| revenue | NUMERIC(24,4) | yes | reported revenue | provider |
-| revenue_growth | NUMERIC(12,4) | yes | revenue growth | provider/derived |
-| eps | NUMERIC(18,6) | yes | earnings per share | provider |
-| eps_growth | NUMERIC(12,4) | yes | EPS growth | provider/derived |
-| profit | NUMERIC(24,4) | yes | reported profit | provider |
-| profit_growth | NUMERIC(12,4) | yes | profit growth | provider/derived |
-| roe | NUMERIC(12,4) | yes | return on equity | provider/derived |
-| roce | NUMERIC(12,4) | yes | return on capital employed | provider/derived |
-| debt_to_equity | NUMERIC(12,4) | yes | leverage ratio | provider/derived |
-| interest_coverage | NUMERIC(12,4) | yes | ability to cover interest | provider/derived |
-| free_cash_flow | NUMERIC(24,4) | yes | free cash flow | provider/derived |
+| period | VARCHAR(30) | no | statement period-end date, e.g. "2026-06-30" — store the raw provider date, not a hand-labeled fiscal quarter (Indian FY runs Apr–Mar, so a "Q1 FY2026" style label is easy to get off-by-one-year; compute display labels at the UI layer only) | provider |
+| period_type | VARCHAR(15) | no | QUARTERLY or ANNUAL | provider/app |
+| revenue | NUMERIC(24,4) | yes | reported revenue (QUARTERLY rows only) | provider |
+| revenue_growth | NUMERIC(12,4) | yes | revenue growth, YoY same-quarter comparison (QUARTERLY rows only) | derived |
+| eps | NUMERIC(18,6) | yes | earnings per share (QUARTERLY rows only) | provider |
+| eps_growth | NUMERIC(12,4) | yes | EPS growth, YoY (QUARTERLY rows only) | derived |
+| profit | NUMERIC(24,4) | yes | reported profit (QUARTERLY rows only) | provider |
+| profit_growth | NUMERIC(12,4) | yes | profit growth, YoY (QUARTERLY rows only) | derived |
+| roe | NUMERIC(12,4) | yes | return on equity, TTM (QUARTERLY rows only) | derived |
+| roce | NUMERIC(12,4) | yes | return on capital employed, TTM (QUARTERLY rows only) | derived |
+| debt_to_equity | NUMERIC(12,4) | yes | leverage ratio (QUARTERLY rows only) | provider |
+| interest_coverage | NUMERIC(12,4) | yes | ability to cover interest, TTM (QUARTERLY rows only) | derived |
+| free_cash_flow | NUMERIC(24,4) | yes | free cash flow (ANNUAL rows only) | provider |
 | snapshot_at | TIMESTAMPTZ | no | snapshot timestamp | provider/app |
 
 Fundamental values may be NULL because not every source provides every
-metric for every instrument.
+metric for every instrument, and because of the cadence split above.
 
 NULL means "unknown/unavailable", not zero.
 
 Indexes:
 
     (instrument_id, snapshot_at)
+    (instrument_id, period_type, snapshot_at)
 
 ---
 
@@ -212,11 +220,12 @@ Stores valuation metrics used primarily by the VALUE objective.
 |---|---|---|---|---|
 | id | BIGSERIAL | no | snapshot identifier | generated |
 | instrument_id | UUID | no | related instrument | app |
-| pe_ratio | NUMERIC(12,4) | yes | price-to-earnings ratio | provider/derived |
-| pb_ratio | NUMERIC(12,4) | yes | price-to-book ratio | provider/derived |
-| ev_ebitda | NUMERIC(18,4) | yes | enterprise value / EBITDA | provider/derived |
-| price_to_sales | NUMERIC(12,4) | yes | price-to-sales ratio | provider/derived |
-| fcf_yield | NUMERIC(12,4) | yes | free-cash-flow yield | provider/derived |
+| pe_ratio | NUMERIC(12,4) | yes | price-to-earnings ratio | provider |
+| pb_ratio | NUMERIC(12,4) | yes | price-to-book ratio | provider |
+| ev_ebitda | NUMERIC(18,4) | yes | enterprise value / EBITDA | provider |
+| price_to_sales | NUMERIC(12,4) | yes | price-to-sales ratio | provider |
+| fcf_yield | NUMERIC(12,4) | yes | free cash flow / current market cap. **Basis varies by instrument** — see `fcf_yield_basis` | derived |
+| fcf_yield_basis | VARCHAR(20) | no, whenever fcf_yield is non-NULL | `TTM_QUARTERLY` (numerator = sum of last 4 QUARTERLY free_cash_flow rows, confirmed available for TCS/INFY) or `ANNUAL` (numerator = latest ANNUAL free_cash_flow row, confirmed the only option for RELIANCE/HDFCBANK). Required whenever `fcf_yield` is populated — never leave the basis implicit. Any cross-instrument comparison of `fcf_yield` (ranking, sorting) must either filter to one basis or treat mixed-basis comparisons as approximate. | app |
 | dividend_yield | NUMERIC(12,4) | yes | dividend yield | provider |
 | observed_at | TIMESTAMPTZ | no | valuation observation time | provider/app |
 
@@ -362,11 +371,36 @@ The database and application must enforce the following rules:
 5. Market price must be greater than zero.
 6. Volume cannot be negative.
 7. Required timestamps must be timezone-aware.
-8. Invalid market observations must not replace valid state.
+8. Invalid market observations must not replace valid state. A write whose
+   `ingestion_version` is not strictly greater than the currently stored
+   value for that instrument must also be rejected — this is the guard
+   against out-of-order writes (e.g. two ingestion runs racing), which is
+   a distinct failure mode from an invalid-value observation and needs its
+   own check.
 9. Missing fundamental data must remain NULL rather than becoming zero.
 10. Users may only access their own watchlists.
 11. Event types must come from the locked event list.
 12. Attention levels must be HIGH, MEDIUM, or LOW.
+13. Queries against `fundamental_snapshots` must filter by `period_type`;
+    an unfiltered "most recent row" query is not guaranteed to return the
+    fully-populated quarterly row (see table notes above).
+14. `period` values must be the provider's raw statement period-end date
+    (ISO format), never a hand-computed fiscal-quarter label — Indian
+    fiscal year (Apr–Mar) labeling is a known source of off-by-one-year
+    errors if computed ad hoc.
+15. `period_type` is assigned by the provider layer at fetch time, based
+    on which yfinance call produced the data
+    (`quarterly_income_stmt`/`quarterly_cashflow` → QUARTERLY,
+    `income_stmt`/`cashflow` → ANNUAL) — the service layer must never
+    infer cadence from the data itself.
+16. `fcf_yield_basis` is required whenever `fcf_yield` is non-NULL, and
+    must not be inferred by the consumer — the provider layer sets it
+    based on whether it used the quarterly or annual fallback path for
+    that instrument's `free_cash_flow`.
+17. In `market_history`, `high_price` must be >= `low_price`, and both
+    `open_price` and `close_price` must fall within
+    `[low_price, high_price]` — validate this at ingestion, don't rely on
+    the provider to guarantee internally consistent OHLC values.
 
 ---
 
@@ -386,3 +420,66 @@ Therefore:
     Tablet ─┘
 
 All devices retrieve the same account state from the backend.
+
+---
+
+# Field Derivation Map (yfinance)
+
+Row names were verified directly against `ticker.quarterly_balance_sheet` /
+`ticker.quarterly_income_stmt` / `ticker.cashflow` for RELIANCE.NS.
+
+| Field | Source | Formula / Row Names | Basis |
+|---|---|---|---|
+| price, previous_close, volume | `info` | direct | point-in-time |
+| market_cap | `info.marketCap` | direct | point-in-time |
+| pe_ratio | `info.trailingPE` | direct | TTM |
+| pb_ratio | `info.priceToBook` | direct | point-in-time |
+| ev_ebitda | `info.enterpriseToEbitda` | direct | TTM |
+| price_to_sales | `info.priceToSalesTrailing12Months` | direct | TTM |
+| dividend_yield | `info.dividendYield` | direct | trailing |
+| debt_to_equity | `info.debtToEquity` | direct — **note**: Yahoo's own calc uses `Total Equity Gross Minority Interest` as denominator, not `Stockholders Equity` (verified: 3.98e12 / 10.86e12 ≈ 36.66% matches; 3.98e12 / 9.04e12 ≈ 44.0% does not). Not on the same equity base as `roe`. | point-in-time |
+| revenue | `quarterly_income_stmt["Total Revenue"]` | direct | per-quarter |
+| eps | `quarterly_income_stmt["Diluted EPS"]` | direct | per-quarter |
+| profit | `quarterly_income_stmt["Net Income"]` | direct | per-quarter |
+| revenue_growth | `quarterly_income_stmt["Total Revenue"]` | `(curr_q - curr_q_minus_4) / curr_q_minus_4`, YoY same-quarter. Confirmed on live data: sequential QoQ swung +5.24%/+11.01%/+8.73%/−6.79% across four consecutive quarters (seasonal noise); YoY gave a stable +18.39%. | YoY |
+| eps_growth | `quarterly_income_stmt["Diluted EPS"]` | same YoY pattern | YoY |
+| profit_growth | `quarterly_income_stmt["Net Income"]` | same YoY pattern | YoY |
+| roe | `quarterly_income_stmt["Net Income"]`, `quarterly_balance_sheet["Stockholders Equity"]` | TTM Net Income (sum last 4 quarters) / period-end Stockholders Equity. Single-quarter ROE (verified 2.32%) is ~4x smaller than annualized (8.93%) and not comparable to TTM-scale metrics elsewhere. | TTM / point-end |
+| roce | `quarterly_income_stmt["EBIT"]`, `quarterly_balance_sheet["Total Assets"]`, `quarterly_balance_sheet["Current Liabilities"]` | TTM EBIT / period-end (Total Assets − Current Liabilities) | TTM / point-end |
+| interest_coverage | `quarterly_income_stmt["EBIT"]`, `quarterly_income_stmt["Interest Expense"]` | TTM EBIT / TTM Interest Expense | TTM |
+| free_cash_flow | `quarterly_cashflow["Free Cash Flow"]` (try first) → fall back to `ticker.cashflow["Free Cash Flow"]` if quarterly is empty | **Ticker-dependent, confirmed by direct test — not universal in either direction.** Cross-ticker `quarterly_cashflow` shape check: RELIANCE.NS `(0,0)` empty, TCS.NS `(46,5)` available, INFY.NS `(51,5)` available, HDFCBANK.NS `(0,0)` empty. Provider layer must attempt the quarterly call first and only fall back to annual when it returns empty — never assume one cadence for all instruments. Annual value confirmed for RELIANCE.NS: `Free Cash Flow → 6.919700e+11` for FY ending 2026-03-31. When quarterly is used, store on a `QUARTERLY` `period_type` row; when falling back to annual, store on an `ANNUAL` row. | quarterly where available, else annual |
+| fcf_yield | `free_cash_flow`, `info.marketCap` (point-in-time) | If basis is `TTM_QUARTERLY`: sum of last 4 quarterly `free_cash_flow` values / marketCap. If basis is `ANNUAL`: latest annual `free_cash_flow` / marketCap — confirmed example, RELIANCE.NS: 691,970,000,000 / 17,889,929,199,616 = **3.87%** (annual basis). Never label an annual-basis figure as TTM. | see `fcf_yield_basis` |
+
+## Known Data Limitations
+
+1. **Quarterly cash flow coverage is ticker-dependent — confirmed, not
+   assumed.** Cross-ticker check: `RELIANCE.NS (0,0)` and `HDFCBANK.NS
+   (0,0)` have no quarterly cash flow data; `TCS.NS (46,5)` and `INFY.NS
+   (51,5)` do. 2 of 4 sampled tickers each way — this is a per-instrument
+   provider gap, not a systemic NSE limitation, and it should be expected
+   to vary across the rest of the tracked universe too. The provider layer
+   must probe `quarterly_cashflow` per-ticker at fetch time (try quarterly,
+   fall back to annual) rather than branching on a hardcoded ticker list or
+   exchange. This is also why `fcf_yield_basis` exists on
+   `valuation_snapshots` — the basis is a per-instrument, potentially
+   per-refresh fact, not a fixed schema-wide assumption.
+
+2. **yfinance quarterly history depth.** `quarterly_income_stmt` /
+   `quarterly_balance_sheet` expose roughly 5 trailing quarters. A YoY
+   comparison uses the oldest available quarter with zero buffer — if a
+   quarter is missing or delayed for a given ticker, the YoY calculation
+   for the newest quarter silently breaks. YoY growth should be computed
+   from the application's own `fundamental_snapshots` history
+   (`snapshot_at` ≈ 365 days prior, `period_type = 'QUARTERLY'`) once at
+   least a year of snapshots has accumulated, not recomputed from
+   yfinance's limited window on every pull.
+
+3. **TTM sums require exactly 4 quarters.** Validate that 4 consecutive
+   `QUARTERLY` rows exist and are non-NULL before summing for `roe`,
+   `roce`, `interest_coverage`. A partial sum (e.g. 3 quarters because the
+   latest filing hasn't landed) produces a silently wrong TTM figure
+   rather than an error — needs an explicit guard in the provider layer.
+
+4. **`debt_to_equity` denominator mismatch** with `roe` — documentation
+   note, not a bug, but blocks any future combined leverage-adjusted
+   return metric from just dividing the two.
