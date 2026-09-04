@@ -1,0 +1,9 @@
+{
+  "RELIANCE.NS": [
+    {"price": 1300.00, "previous_close": 1290.00, "volume": 12000000, "market_cap": null, "pe_ratio": 23.5, "dividend_yield": 0.4, "observed_at": "2026-09-05T04:00:00+00:00", "source": "replay"},
+    {"price": 1300.50, "previous_close": 1290.00, "volume": 12050000, "market_cap": null, "pe_ratio": 23.5, "dividend_yield": 0.4, "observed_at": "2026-09-05T04:05:00+00:00", "source": "replay"},
+    {"price": 1404.00, "previous_close": 1300.50, "volume": 18000000, "market_cap": null, "pe_ratio": 25.1, "dividend_yield": 0.4, "observed_at": "2026-09-05T04:10:00+00:00", "source": "replay"},
+    {"price": -10.00, "previous_close": 1404.00, "volume": 100000, "market_cap": null, "pe_ratio": null, "dividend_yield": null, "observed_at": "2026-09-05T04:15:00+00:00", "source": "replay"},
+    {"price": 1410.00, "previous_close": 1404.00, "volume": 9000000, "market_cap": null, "pe_ratio": 25.2, "dividend_yield": 0.4, "observed_at": "2026-09-05T03:50:00+00:00", "source": "replay"}
+  ]
+}
