@@ -79,17 +79,22 @@ def score_events_for_watchlist(
 
 
 async def get_scored_events_since_last_visit(
-    db: AsyncSession, watchlist_id,
+    db: AsyncSession, watchlist_id, objective_override: Objective | None = None,
 ) -> list[ScoredEvent]:
-    """Full orchestration: fetches the watchlist (for its objective) and
-    every MarketEvent since the last-visit boundary, then scores them.
-    Returns [] if the watchlist doesn't exist — ownership/404 enforcement
-    is the router layer's job (via the existing _get_owned_watchlist
-    pattern), not this function's."""
+    """Full orchestration: fetches the watchlist and every MarketEvent
+    since the last-visit boundary, then scores them under the effective
+    objective. objective_override lets a caller (Phase 7.4's GET
+    endpoint, via a query param) score under a different objective than
+    the watchlist's stored one, WITHOUT persisting it or introducing any
+    new scoring logic — it's substituted in place of watchlist.objective,
+    nothing more. Returns [] if the watchlist doesn't exist —
+    ownership/404 enforcement is the router layer's job (via the
+    existing _get_owned_watchlist pattern), not this function's."""
     result = await db.execute(select(Watchlist).where(Watchlist.id == watchlist_id))
     watchlist = result.scalar_one_or_none()
     if watchlist is None:
         return []
 
+    effective_objective = objective_override or watchlist.objective
     events = await get_since_last_visit_events(db, watchlist_id)
-    return score_events_for_watchlist(events, watchlist.objective)
+    return score_events_for_watchlist(events, effective_objective)

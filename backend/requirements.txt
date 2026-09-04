@@ -14,3 +14,4 @@ yfinance==0.2.44
 email-validator==2.2.0
 pytest-asyncio==1.4.0
 greenlet==3.5.5
+httpx==0.28.1
