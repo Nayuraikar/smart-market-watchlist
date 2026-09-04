@@ -16,7 +16,7 @@ here first, then the implementation, then the tests.
 |--------------|--------|--------------|--------|
 | P/E ratio     | 40%    | Lower better | MarketObservation.pe_ratio (market-state, not fundamentals) |
 | P/B ratio     | 30%    | Lower better | UNAVAILABLE — see note below. Always treated as missing. |
-| FCF yield     | 30%    | Higher better| Derived: FundamentalSnapshot.free_cash_flow / MarketObservation.market_cap, computed in the scoring-input prep layer, not stored |
+| FCF yield     | 30%    | Higher better| Derived: (FundamentalSnapshot.free_cash_flow / MarketObservation.market_cap) x 100, expressed as a percentage to stay consistent with revenue_growth/eps_growth-style metrics, computed in the scoring-input prep layer, not stored |
 
 P/B ratio note: computing it would require book equity, which is not
 directly stored. FundamentalSnapshot.roe is profit/equity as an

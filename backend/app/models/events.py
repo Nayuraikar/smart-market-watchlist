@@ -25,6 +25,7 @@ class MarketEvent(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     source: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    data_quality: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -33,6 +34,7 @@ class MarketEvent(Base):
             name="ck_market_event_type",
         ),
         CheckConstraint("importance IN ('HIGH','MEDIUM','LOW')", name="ck_market_event_importance"),
+        CheckConstraint("data_quality IS NULL OR data_quality IN ('FRESH','STALE','UNAVAILABLE')", name="ck_market_event_data_quality"),
         Index("ix_market_events_instrument_ts", "instrument_id", "timestamp"),
         Index("ix_market_events_instrument_importance_ts", "instrument_id", "importance", "timestamp"),
     )

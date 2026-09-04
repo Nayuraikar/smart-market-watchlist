@@ -151,6 +151,7 @@ async def ingest_observation(
             title=f"{obs.ticker} moved {pct:.2f}%",
             details={"previous_price": str(previous_price), "new_price": str(obs.price)},
             source=obs.source,
+            data_quality=data_quality,  # Decision 15 — event-time snapshot, same transaction
         ))
 
     await db.commit()

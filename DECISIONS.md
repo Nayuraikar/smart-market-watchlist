@@ -423,3 +423,46 @@ view. A lost successful response may result in a subsequent request treating
 the same baseline as already viewed, which is an accepted tradeoff.
 
 ---
+### Decision 13 — Per-instrument comparison boundary
+
+comparison_boundary(item) = item.added_at if watchlist.last_viewed_at IS NULL,
+else max(watchlist.last_viewed_at, item.added_at). The since-last-visit event
+query is per watchlist_item (join against this boundary), never a single
+watchlist-level `timestamp > last_viewed_at` filter.
+
+Rationale: Decision 9's "beginning of time" for a first visit must mean
+"beginning of that instrument's membership in the watchlist," not literally
+unbounded — an event from before a stock was added must never surface as
+"since last visit" for it, matching BUILD_ROADMAP.md Phase 7's explicit
+TCS check (last viewed 10:00, added 12:00, event at 11:00 excluded / 13:00
+included).
+
+---
+
+### Decision 14 — since_last_visit.events attribution
+
+Each entry in since_last_visit.events is the frozen 8-field
+RELEVANCE_ATTENTION_SPEC.md section 7 explanation object, flattened with two
+additional sibling fields: instrument_id and symbol. The 8-field contract
+itself is not modified — Phase 7 owns only the wrapping shape.
+
+Rationale: without an instrument identifier, the frontend cannot attribute
+an event in the flat, non-deduplicated events list to a specific stock card.
+
+### Decision 15 — Event-time data-quality snapshot
+
+MarketEvent.data_quality stores the MarketState.data_quality value computed for the
+observation that caused the event (FRESH/STALE/UNAVAILABLE), set at event-creation time
+inside the same atomic ingestion transaction. Intelligence scoring (score_event) uses this
+event-time snapshot, never the instrument's current MarketState.data_quality — an old
+event's relevance must not silently change because today's data happens to be stale.
+
+The column is nullable to accommodate pre-existing MarketEvent rows created before this
+field existed.
+
+Legacy-NULL handling (closed, not deferred): data_quality IS NULL is treated identically to
+"UNAVAILABLE" by get_data_confidence — confidence 0.0, event suppressed from attention
+scoring entirely (section 4 rule 2), never silently scored as FRESH or STALE. This is
+consistent with BUILD_ROADMAP.md's rule to never silently convert NULL into a zero *value*:
+UNAVAILABLE is the existing frozen "no usable value at all" category, not an invented
+default — a NULL snapshot honestly has no known freshness, so it belongs there.
