@@ -3,6 +3,10 @@ from pathlib import Path
 from app.schemas.market import MarketObservation
 
 
+class ReplayExhausted(Exception):
+    """Raised when a ticker's replay timeline has no more observations."""
+
+
 class ReplayProvider:
     """Feeds pre-recorded observations in order, one step per call per
     ticker — the resilience-testing backbone for Phase 9 failure injection.
@@ -25,7 +29,7 @@ class ReplayProvider:
             raise ValueError(f"No replay data for {ticker}")
         idx = self._cursor[ticker]
         if idx >= len(timeline):
-            raise StopIteration(f"Replay exhausted for {ticker}")
+            raise ReplayExhausted(f"Replay exhausted for {ticker}")
         obs = timeline[idx]
         self._cursor[ticker] += 1
         return obs

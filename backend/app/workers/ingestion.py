@@ -3,7 +3,7 @@ import asyncio
 import argparse
 
 from app.db import AsyncSessionLocal
-from app.services.providers.replay import ReplayProvider
+from app.services.providers.replay import ReplayProvider, ReplayExhausted
 from app.services.ingestion import ingest_observation
 
 
@@ -17,7 +17,7 @@ async def run(scenario_path: str, tickers: list[str] | None = None) -> None:
             while True:
                 try:
                     obs = await provider.get_stock(ticker)
-                except StopIteration:
+                except ReplayExhausted:
                     break
                 step += 1
                 outcome = await ingest_observation(db, obs)
