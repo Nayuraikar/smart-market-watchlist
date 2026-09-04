@@ -19,6 +19,12 @@ RELATIVE_OUTPERFORMANCE_THRESHOLD_PCT = Decimal("3.0")
 # Multiple of the trailing 20-day average volume, not a percentage.
 RVOL_WINDOW = 20
 RVOL_THRESHOLD = Decimal("2.0")
+# "52-week" target in trading observations, not calendar days. See
+# DECISIONS.md Phase 6 note: during the build window we will never
+# accumulate 252 real trading days, so window_days_used is surfaced
+# explicitly rather than pretending every window is a genuine 52 weeks.
+WINDOW_TARGET_DAYS = 252
+MIN_OBSERVATIONS_FOR_52W = 5
 
 
 def compute_return(previous: Decimal | None, current: Decimal) -> Decimal | None:
@@ -175,6 +181,112 @@ def detect_volume_surge(
     )
 
 
+def _windowed_prior_prices(
+    trailing_prices: list[Decimal],
+    window_target: int,
+) -> list[Decimal]:
+    """Most recent `window_target` entries of trailing_prices, which must
+    already EXCLUDE today's observation. If fewer than window_target
+    exist, returns everything available — the partial-window case."""
+    if window_target <= 0:
+        return []
+    return trailing_prices[-window_target:]
+
+
+def detect_52w_high(
+    instrument_id: str,
+    current_price: Decimal,
+    trailing_prices: list[Decimal],
+    detected_at: datetime,
+    baseline_timestamp: datetime | None = None,
+    window_target: int = WINDOW_TARGET_DAYS,
+    min_observations: int = MIN_OBSERVATIONS_FOR_52W,
+) -> ChangeEvent | None:
+    """Fires when current_price exceeds the max of the trailing prior
+    window (today's price is NOT part of its own comparison window).
+
+    window_days_used = min(len(trailing_prices), window_target) — this is
+    an ADAPTIVE window, not a strict 252-observation requirement. Below
+    min_observations, returns None (a 1-4 day 'high' isn't meaningful).
+    Above that floor, it fires and is honest about partial coverage via
+    details.window_days_used / details.is_full_window rather than either
+    refusing to fire (dead feature during a short build) or silently
+    pretending a partial window is a genuine 52-week high.
+
+    No duplicate-event spam on a flat plateau at the new high: once
+    today's record price fires, tomorrow's trailing window shifts to
+    include it, so an equal (not greater) price the next day fails the
+    strict '>' comparison and does not re-fire.
+    """
+    windowed = _windowed_prior_prices(trailing_prices, window_target)
+    window_days_used = len(windowed)
+    if window_days_used < min_observations:
+        return None
+
+    prior_max = max(windowed)
+    if current_price <= prior_max:
+        return None
+
+    is_full_window = window_days_used >= window_target
+
+    return ChangeEvent(
+        instrument_id=instrument_id,
+        event_type="52W_HIGH",
+        previous_value=prior_max,
+        current_value=current_price,
+        delta=current_price - prior_max,
+        detected_at=detected_at,
+        baseline_timestamp=baseline_timestamp,
+        reason=f"new_high_{window_days_used}d_window",
+        details={
+            "prior_max": str(prior_max),
+            "window_days_used": window_days_used,
+            "window_target_days": window_target,
+            "is_full_window": is_full_window,
+        },
+    )
+
+
+def detect_52w_low(
+    instrument_id: str,
+    current_price: Decimal,
+    trailing_prices: list[Decimal],
+    detected_at: datetime,
+    baseline_timestamp: datetime | None = None,
+    window_target: int = WINDOW_TARGET_DAYS,
+    min_observations: int = MIN_OBSERVATIONS_FOR_52W,
+) -> ChangeEvent | None:
+    """Mirror of detect_52w_high using min() instead of max(). See that
+    docstring for the adaptive-window and no-duplicate-plateau reasoning."""
+    windowed = _windowed_prior_prices(trailing_prices, window_target)
+    window_days_used = len(windowed)
+    if window_days_used < min_observations:
+        return None
+
+    prior_min = min(windowed)
+    if current_price >= prior_min:
+        return None
+
+    is_full_window = window_days_used >= window_target
+
+    return ChangeEvent(
+        instrument_id=instrument_id,
+        event_type="52W_LOW",
+        previous_value=prior_min,
+        current_value=current_price,
+        delta=current_price - prior_min,
+        detected_at=detected_at,
+        baseline_timestamp=baseline_timestamp,
+        reason=f"new_low_{window_days_used}d_window",
+        details={
+            "prior_min": str(prior_min),
+            "window_days_used": window_days_used,
+            "window_target_days": window_target,
+            "is_full_window": is_full_window,
+        },
+    )
+
+
 def detect_change(
     instrument_id: str,
     previous_price: Decimal | None,
@@ -185,18 +297,18 @@ def detect_change(
     benchmark_current: Decimal | None = None,
     current_volume: Decimal | None = None,
     trailing_volumes: list[Decimal] | None = None,
+    trailing_prices: list[Decimal] | None = None,
 ) -> list[ChangeEvent]:
     """Umbrella orchestrator. Runs every available detector and returns
     ALL triggered events — a single observation can legitimately fire
     more than one event type at once (e.g. PRICE_MOVE and
     RELATIVE_OUTPERFORMANCE together). Returns [] when nothing fires.
 
-    Benchmark checks only run when benchmark_current is provided.
-    Volume checks only run when BOTH current_volume and trailing_volumes
-    are provided, so the function stays usable without silently
-    fabricating a comparison when volume history isn't on hand.
-
-    52W_HIGH/LOW plug in here once 6.6 is built.
+    Benchmark checks only run when benchmark_current is provided. Volume
+    checks only run when BOTH current_volume and trailing_volumes are
+    provided. 52W_HIGH/LOW checks only run when trailing_prices is
+    provided. Each guard exists so the function stays usable without
+    silently fabricating a comparison when that history isn't on hand.
     """
     events: list[ChangeEvent] = []
 
@@ -233,5 +345,26 @@ def detect_change(
         )
         if volume_surge is not None:
             events.append(volume_surge)
+
+    if trailing_prices is not None:
+        high_event = detect_52w_high(
+            instrument_id=instrument_id,
+            current_price=current_price,
+            trailing_prices=trailing_prices,
+            detected_at=detected_at,
+            baseline_timestamp=baseline_timestamp,
+        )
+        if high_event is not None:
+            events.append(high_event)
+
+        low_event = detect_52w_low(
+            instrument_id=instrument_id,
+            current_price=current_price,
+            trailing_prices=trailing_prices,
+            detected_at=detected_at,
+            baseline_timestamp=baseline_timestamp,
+        )
+        if low_event is not None:
+            events.append(low_event)
 
     return events

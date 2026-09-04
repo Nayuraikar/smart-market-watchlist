@@ -297,3 +297,131 @@ def test_all_three_event_types_coexist():
     event_types = {e.event_type for e in events}
     assert event_types == {"PRICE_MOVE", "RELATIVE_OUTPERFORMANCE", "VOLUME_SURGE"}
     assert len(events) == 3
+
+
+# ---- 6.6: 52W_HIGH / 52W_LOW as state transitions (adaptive window) ----
+
+from app.services.change_detection import detect_52w_high, detect_52w_low  # noqa: E402
+
+
+def test_52w_high_cold_start_fewer_than_min_observations_no_event():
+    """3 prior observations is below the 5-observation floor — must not
+    fire, same 'don't fabricate a baseline' rule as the other detectors."""
+    trailing = [Decimal("100"), Decimal("105"), Decimal("110")]
+    event = detect_52w_high("iid-1", Decimal("200"), trailing, NOW)
+    assert event is None
+
+
+def test_52w_low_cold_start_fewer_than_min_observations_no_event():
+    trailing = [Decimal("100"), Decimal("95"), Decimal("90")]
+    event = detect_52w_low("iid-1", Decimal("1"), trailing, NOW)
+    assert event is None
+
+
+def test_52w_high_partial_window_fires_and_reports_partial():
+    """Exactly 5 prior observations (the floor) — fires, but is_full_window
+    must be False and window_days_used must equal 5, not 252."""
+    trailing = [Decimal("100"), Decimal("102"), Decimal("101"), Decimal("103"), Decimal("104")]
+    event = detect_52w_high("iid-1", Decimal("110"), trailing, NOW)
+    assert event is not None
+    assert event.event_type == "52W_HIGH"
+    assert event.details["window_days_used"] == 5
+    assert event.details["window_target_days"] == 252
+    assert event.details["is_full_window"] is False
+    assert event.previous_value == Decimal("104")
+
+
+def test_52w_low_partial_window_fires_and_reports_partial():
+    trailing = [Decimal("100"), Decimal("98"), Decimal("99"), Decimal("97"), Decimal("96")]
+    event = detect_52w_low("iid-1", Decimal("90"), trailing, NOW)
+    assert event is not None
+    assert event.event_type == "52W_LOW"
+    assert event.details["window_days_used"] == 5
+    assert event.details["is_full_window"] is False
+    assert event.previous_value == Decimal("96")
+
+
+def test_52w_high_full_window_reports_full():
+    """252 prior observations -> is_full_window True, and only the most
+    recent 252 are used even if more are passed in."""
+    trailing = [Decimal("100")] * 260  # 260 > 252, extra 8 must be ignored
+    trailing[-1] = Decimal("150")  # most recent prior obs is the max
+    event = detect_52w_high("iid-1", Decimal("200"), trailing, NOW)
+    assert event is not None
+    assert event.details["window_days_used"] == 252
+    assert event.details["is_full_window"] is True
+    assert event.previous_value == Decimal("150")
+
+
+def test_52w_high_not_new_high_no_event():
+    trailing = [Decimal("100"), Decimal("200"), Decimal("150"), Decimal("120"), Decimal("110")]
+    event = detect_52w_high("iid-1", Decimal("199"), trailing, NOW)  # below prior max of 200
+    assert event is None
+
+
+def test_52w_low_not_new_low_no_event():
+    trailing = [Decimal("100"), Decimal("50"), Decimal("70"), Decimal("80"), Decimal("90")]
+    event = detect_52w_low("iid-1", Decimal("51"), trailing, NOW)  # above prior min of 50
+    assert event is None
+
+
+def test_52w_high_boundary_equal_to_prior_max_no_event():
+    """Exactly equal to the prior max must NOT fire — strict '>' only,
+    this is the core of the 'was-below -> now-crosses, not is-equal-to' rule."""
+    trailing = [Decimal("100"), Decimal("105"), Decimal("103"), Decimal("101"), Decimal("104")]
+    event = detect_52w_high("iid-1", Decimal("105"), trailing, NOW)
+    assert event is None
+
+
+def test_52w_low_boundary_equal_to_prior_min_no_event():
+    trailing = [Decimal("100"), Decimal("95"), Decimal("97"), Decimal("99"), Decimal("96")]
+    event = detect_52w_low("iid-1", Decimal("95"), trailing, NOW)
+    assert event is None
+
+
+def test_52w_high_plateau_does_not_duplicate_across_two_days():
+    """Simulates two consecutive days: day N sets a new high, day N+1
+    repeats the exact same price. Day N+1 must NOT fire again, because
+    day N's record price has entered day N+1's trailing window and the
+    plateau price only ties it rather than beating it."""
+    trailing_day_n = [Decimal("100"), Decimal("102"), Decimal("101"), Decimal("103"), Decimal("104")]
+    new_high_price = Decimal("110")
+
+    day_n_event = detect_52w_high("iid-1", new_high_price, trailing_day_n, NOW)
+    assert day_n_event is not None  # day N: legitimate new high
+
+    trailing_day_n_plus_1 = trailing_day_n + [new_high_price]  # today's record enters tomorrow's window
+    day_n_plus_1_event = detect_52w_high("iid-1", new_high_price, trailing_day_n_plus_1, NOW)
+    assert day_n_plus_1_event is None  # day N+1: same price, must not re-fire
+
+
+def test_52w_low_plateau_does_not_duplicate_across_two_days():
+    trailing_day_n = [Decimal("100"), Decimal("98"), Decimal("99"), Decimal("97"), Decimal("96")]
+    new_low_price = Decimal("90")
+
+    day_n_event = detect_52w_low("iid-1", new_low_price, trailing_day_n, NOW)
+    assert day_n_event is not None
+
+    trailing_day_n_plus_1 = trailing_day_n + [new_low_price]
+    day_n_plus_1_event = detect_52w_low("iid-1", new_low_price, trailing_day_n_plus_1, NOW)
+    assert day_n_plus_1_event is None
+
+
+def test_detect_change_includes_both_52w_events_when_provided():
+    """A single call can only realistically fire one of HIGH/LOW (price
+    can't be both above a max and below a min), but confirms detect_change
+    wires trailing_prices through to both detectors correctly."""
+    trailing = [Decimal("100"), Decimal("105"), Decimal("103"), Decimal("101"), Decimal("104")]
+    events = detect_change(
+        "iid-1", Decimal("104"), Decimal("106"),  # tiny move, won't fire PRICE_MOVE
+        NOW,
+        trailing_prices=trailing,
+    )
+    event_types = {e.event_type for e in events}
+    assert "52W_HIGH" in event_types
+    assert "52W_LOW" not in event_types
+
+
+def test_detect_change_without_trailing_prices_skips_52w_check():
+    events = detect_change("iid-1", Decimal("100"), Decimal("100.1"), NOW)
+    assert events == []

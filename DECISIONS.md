@@ -93,3 +93,27 @@ rather than preventing the core instrument universe from being created.
   The system therefore treats yfinance as a best-effort external source,
   preserves the last validated market state on provider failure, and
   does not claim exchange-grade feed reliability.
+
+### Phase 6.6: 52W_HIGH / 52W_LOW window honesty
+
+- "52-week" high/low is measured in trading observations, not calendar
+  time. The target window is 252 prior observations, but during this
+  build window the system will never accumulate 252 real trading days,
+  so a strict 252-observation requirement would make this event type
+  permanently dead code — untestable against real behavior and never
+  demonstrable live.
+- Instead the window is adaptive: window_days_used = min(available prior
+  observations, 252), with a floor of 5 prior observations before the
+  detector is allowed to fire at all. Every emitted 52W_HIGH/52W_LOW
+  event carries details.window_days_used, details.window_target_days
+  (always 252), and details.is_full_window (bool) so a partial-history
+  "high" is never presented as equivalent to a genuine 52-week high.
+- This follows the same disclosure principle as the freshness badges in
+  Phase 8 (surface the limitation, don't hide it) applied to window
+  size instead of data recency.
+- Breakout events are state transitions, not equality checks: a value is
+  compared with strict > (HIGH) or < (LOW) against the max/min of the
+  prior window, excluding today's own observation. Because today's
+  record price enters tomorrow's window, a flat plateau at the new
+  high/low never re-fires on its own — no separate "already notified"
+  tracking is needed.
