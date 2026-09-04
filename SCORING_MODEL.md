@@ -28,9 +28,9 @@ here first, then the implementation, then the tests.
 ## Missing data handling
 - All required metrics present → full weighted score
 - Some metrics missing, remaining coverage sufficient (>= 60% of total
-  weight, TBD exact threshold — confirm before 6.7) → renormalize
+  weight — CONFIRMED, this is the final threshold) → renormalize
   remaining weights to sum to 100%, compute score on those alone
-- Coverage below threshold → return INSUFFICIENT_DATA, never a
+- Coverage below 60% of total weight → return INSUFFICIENT_DATA, never a
   fabricated or partial-looking numeric score
 
 ## Percentile normalization
