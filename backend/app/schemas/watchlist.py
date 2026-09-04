@@ -24,5 +24,16 @@ class WatchlistOut(BaseModel):
         from_attributes = True
 
 
-class WatchlistItemCreate(BaseModel):
+class StockAdd(BaseModel):
+    ticker: str = Field(min_length=1, max_length=30)
+
+
+class StockOut(BaseModel):
     instrument_id: UUID
+    ticker: str
+    name: str
+    exchange: str
+    added_at: datetime
+
+    class Config:
+        from_attributes = True
