@@ -78,3 +78,18 @@ instrument seeding. yfinance Ticker.info is currently rate-limited by
 Yahoo quoteSummary, while market history remains available through the
 history endpoint. Metadata failures therefore leave sector/industry NULL
 rather than preventing the core instrument universe from being created.
+
+### Phase 5: Ingestion decisions
+
+- PRICE_MOVE events trigger at an absolute price change of >= 2%.
+  This threshold is intentionally explicit and is covered by boundary tests.
+
+- ingestion_version is application-derived from observed_at because
+  yfinance does not expose a provider-side monotonic sequence number.
+  Production providers should use a native provider sequence/event ID
+  when available.
+
+- The live yfinance provider returned HTTP 429 during development.
+  The system therefore treats yfinance as a best-effort external source,
+  preserves the last validated market state on provider failure, and
+  does not claim exchange-grade feed reliability.
