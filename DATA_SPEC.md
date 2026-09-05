@@ -1,3 +1,5 @@
+> Current demo data: see [data/README.md](data/README.md) for the complete synthetic dataset, units and provenance. Provider field derivations below describe earlier captured data and are not runtime network integrations.
+
 # Data Spec
 
 This document defines the persistent data model for the Smart Market

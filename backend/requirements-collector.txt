@@ -1,0 +1,2 @@
+# Optional one-time data collection; not part of backend/runtime requirements.
+yfinance==1.7.0

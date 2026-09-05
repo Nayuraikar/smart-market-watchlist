@@ -19,4 +19,10 @@ export interface InstrumentDetail {
   objective: Objective;
   current_data: CurrentMarketData | null;
   events: ScoredEventExplanation[];
+  price_history: PriceHistoryPoint[];
+}
+export interface PriceHistoryPoint {
+  timestamp: string;
+  price: number | string;
+  volume: number | string;
 }

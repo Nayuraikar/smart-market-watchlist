@@ -6,7 +6,7 @@ from app.seed import TICKERS, ensure_instruments_exist
 
 
 REQUIRED_TICKERS = {
-    "TCS.NS", "LTIM.NS", "PERSISTENT.NS", "COFORGE.NS",
+    "TCS.NS", "LTM.NS", "PERSISTENT.NS", "COFORGE.NS",
     "HDFCBANK.NS", "SHRIRAMFIN.NS", "RELIANCE.NS", "SUNPHARMA.NS",
     "MARUTI.NS", "ITC.NS", "TATASTEEL.NS", "BHARTIARTL.NS", "LT.NS",
 }

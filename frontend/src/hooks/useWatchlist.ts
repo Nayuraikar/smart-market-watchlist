@@ -11,6 +11,7 @@ export const useWatchlist = (watchlistId: string, objective?: Objective) => {
     queryKey: ['watchlist', watchlistId, 'since-last-visit', { objective }],
     queryFn: () => watchlistsApi.get(watchlistId, objective),
     enabled: !!watchlistId,
+    refetchInterval: 5000,
   });
 };
 
@@ -19,6 +20,7 @@ export const useWatchlistStocks = (watchlistId: string) => {
     queryKey: ['watchlist', watchlistId, 'stocks'],
     queryFn: () => stocksApi.list(watchlistId),
     enabled: !!watchlistId,
+    refetchInterval: 5000,
   });
 };
 
@@ -27,6 +29,7 @@ export const useInstrumentDetail = (watchlistId: string, instrumentId: string, o
     queryKey: ['watchlist', watchlistId, 'stock', instrumentId, { objective }],
     queryFn: () => stocksApi.detail(watchlistId, instrumentId, objective),
     enabled: !!watchlistId && !!instrumentId,
+    refetchInterval: 5000,
   });
 };
 

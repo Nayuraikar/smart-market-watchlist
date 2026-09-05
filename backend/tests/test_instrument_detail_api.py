@@ -207,3 +207,29 @@ async def test_instrument_detail_missing_instrument_returns_404(
     finally:
         await db.execute(delete(Watchlist).where(Watchlist.id == watchlist.id))
         await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_price_history_returns_latest_180_in_chronological_order(client, db, make_user):
+    from app.models import MarketHistory
+    user, token = await make_user()
+    instrument = await _instrument(db)
+    watchlist = await _watchlist(db, user)
+    db.add(WatchlistItem(watchlist_id=watchlist.id, instrument_id=instrument.id))
+    start = datetime.now(timezone.utc) - timedelta(days=181)
+    for index in range(181):
+        price = Decimal(100 + index)
+        db.add(MarketHistory(instrument_id=instrument.id, open_price=price, high_price=price,
+            low_price=price, close_price=price, volume=1000, timestamp=start + timedelta(days=index)))
+    await db.commit()
+    try:
+        response = await client.get(f'/watchlists/{watchlist.id}/stocks/{instrument.id}', headers=_auth(token))
+        assert response.status_code == 200
+        history = response.json()['price_history']
+        assert len(history) == 180
+        assert [Decimal(row['price']) for row in history] == [Decimal(value) for value in range(101, 281)]
+        assert [row['timestamp'] for row in history] == sorted(row['timestamp'] for row in history)
+        assert all(Decimal(row['volume']) == 1000 for row in history)
+    finally:
+        await db.execute(delete(MarketHistory).where(MarketHistory.instrument_id == instrument.id))
+        await _cleanup(db, watchlist.id, instrument.id)

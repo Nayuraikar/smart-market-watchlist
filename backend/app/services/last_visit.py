@@ -9,6 +9,8 @@ watchlist's objective — scoring is never baked in at ingestion time
 (Decision 16, Option A), only computed here, at GET time.
 """
 
+from datetime import datetime
+
 from sqlalchemy import select, case, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,8 +27,8 @@ def _comparison_boundary():
     )
 
 
-async def get_since_last_visit_events(db: AsyncSession, watchlist_id) -> list[MarketEvent]:
-    boundary = _comparison_boundary()
+async def get_since_last_visit_events(db: AsyncSession, watchlist_id, since: datetime | None = None) -> list[MarketEvent]:
+    boundary = func.greatest(since, WatchlistItem.added_at) if since is not None else _comparison_boundary()
     stmt = (
         select(MarketEvent)
         .join(WatchlistItem, WatchlistItem.instrument_id == MarketEvent.instrument_id)
@@ -80,6 +82,7 @@ def score_events_for_watchlist(
 
 async def get_scored_events_since_last_visit(
     db: AsyncSession, watchlist_id, objective_override: Objective | None = None,
+    since: datetime | None = None,
 ) -> list[ScoredEvent]:
     """Full orchestration: fetches the watchlist and every MarketEvent
     since the last-visit boundary, then scores them under the effective
@@ -96,5 +99,5 @@ async def get_scored_events_since_last_visit(
         return []
 
     effective_objective = objective_override or watchlist.objective
-    events = await get_since_last_visit_events(db, watchlist_id)
+    events = await get_since_last_visit_events(db, watchlist_id, since)
     return score_events_for_watchlist(events, effective_objective)

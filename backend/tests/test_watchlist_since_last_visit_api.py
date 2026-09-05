@@ -1374,3 +1374,44 @@ async def test_viewed_returns_watchlist(
         )
 
         await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_session_boundary_survives_acknowledgement_and_objective_switch(client, db, make_user):
+    user, token = await make_user()
+    instrument = await _mk_instrument(db, _unique_ticker())
+    watchlist = await _mk_watchlist(db, user)
+    item = await _add_item(db, watchlist, instrument)
+    now = datetime.now(timezone.utc)
+    boundary = now - timedelta(minutes=3)
+    item.added_at = boundary
+    await db.commit()
+    try:
+        for price, minutes in [(100, 2), (106, 1)]:
+            await ingest_observation(db, MarketObservation(
+                ticker=instrument.ticker, price=Decimal(price), volume=Decimal(1000),
+                observed_at=now - timedelta(minutes=minutes), source='historical-simulation',
+            ))
+        path = f'/watchlists/{watchlist.id}'
+        first = await client.get(path, headers=_auth(token))
+        assert first.json()['since_last_visit']['meaningful_change_count'] == 1
+        assert (await client.post(path + '/viewed', headers=_auth(token))).status_code == 200
+        normal = await client.get(path, headers=_auth(token))
+        assert normal.json()['since_last_visit']['meaningful_change_count'] == 0
+        for objective in ['GROWTH', 'VALUE', 'STABILITY']:
+            response = await client.get(path, headers=_auth(token), params={
+                'since': boundary.isoformat(), 'objective': objective,
+            })
+            assert response.status_code == 200
+            assert response.json()['since_last_visit']['meaningful_change_count'] == 1
+        # A later boundary still excludes events; a session cannot bypass tracking start.
+        response = await client.get(path, headers=_auth(token), params={'since': now.isoformat()})
+        assert response.json()['since_last_visit']['meaningful_change_count'] == 0
+        response = await client.get(path, headers=_auth(token), params={'since': '2020-01-01T00:00:00'})
+        assert response.status_code == 400
+    finally:
+        await _cleanup_instrument_rows(db, instrument.id)
+        await db.execute(delete(WatchlistItem).where(WatchlistItem.watchlist_id == watchlist.id))
+        await db.execute(delete(Watchlist).where(Watchlist.id == watchlist.id))
+        await db.execute(delete(Instrument).where(Instrument.id == instrument.id))
+        await db.commit()

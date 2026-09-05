@@ -23,6 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     localStorage.removeItem('access_token');
+    Object.keys(sessionStorage).filter(key => key.startsWith('watchlist-boundary:')).forEach(key => sessionStorage.removeItem(key));
     setTokenState(null);
     queryClient.removeQueries({ queryKey: ['auth', 'me'] });
     queryClient.removeQueries({ queryKey: ['watchlists'] }); // Clear all related watchlists queries

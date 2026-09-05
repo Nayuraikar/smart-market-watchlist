@@ -15,6 +15,7 @@ export default function Navbar() {
             </Link>
           </div>
           <div className="flex items-center gap-4">
+            <span className="text-xs font-medium text-amber-700">Historical market replay</span>
             <span className="text-sm text-slate-600 hidden sm:inline-block font-medium">{user?.email}</span>
             <button
               onClick={logout}

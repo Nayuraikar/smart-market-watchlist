@@ -1,29 +1,24 @@
 import { Objective } from '../../types/market';
-import { TrendingUp, DollarSign, Shield } from 'lucide-react';
 
 interface ObjectiveSelectorProps {
   currentObjective: Objective;
   onChange: (obj: Objective) => void;
 }
-
-const OBJECTIVES: { value: Objective; label: string; description: string; icon: typeof TrendingUp }[] = [
+const OBJECTIVES: { value: Objective; label: string; description: string }[] = [
   {
     value: 'GROWTH',
     label: 'Growth',
-    description: 'Revenue, earnings & momentum',
-    icon: TrendingUp,
+    description: 'The change feed prioritizes events relevant to a growth-oriented investor.',
   },
   {
     value: 'VALUE',
     label: 'Value',
-    description: 'Fundamentals, multiples & yield',
-    icon: DollarSign,
+    description: 'The same underlying events are evaluated through the value lens.',
   },
   {
     value: 'STABILITY',
     label: 'Stability',
-    description: 'Low volatility & balance sheet strength',
-    icon: Shield,
+    description: 'The same underlying events are evaluated through the stability lens.',
   },
 ];
 
@@ -32,9 +27,9 @@ export default function ObjectiveSelector({ currentObjective, onChange }: Object
     <div
       role="group"
       aria-label="Viewing objective"
-      className="flex flex-col sm:flex-row gap-2"
+      className="inline-flex p-1 bg-slate-100 rounded-lg border border-slate-200 gap-1 shadow-inner"
     >
-      {OBJECTIVES.map(({ value, label, description, icon: Icon }) => {
+      {OBJECTIVES.map(({ value, label, description }) => {
         const isActive = currentObjective === value;
         return (
           <button
@@ -44,16 +39,14 @@ export default function ObjectiveSelector({ currentObjective, onChange }: Object
             aria-pressed={isActive}
             title={`${label}: ${description}`}
             className={`
-              flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold
-              transition-all border
-              focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500
+              flex items-center justify-center px-3 sm:px-5 py-2 rounded-md text-xs font-bold transition-all duration-150
+              focus:outline-none focus:ring-2 focus:ring-emerald-500
               ${isActive
-                ? 'bg-white text-blue-700 border-blue-300 shadow-sm ring-1 ring-blue-200'
-                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-white hover:text-slate-900 hover:border-slate-300 hover:shadow-sm'
+                ? 'bg-white text-emerald-700 shadow-sm border border-slate-200'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }
             `}
           >
-            <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} aria-hidden="true" />
             <span>{label}</span>
           </button>
         );

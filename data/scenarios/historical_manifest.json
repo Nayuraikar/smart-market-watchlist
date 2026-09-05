@@ -1,0 +1,297 @@
+{
+  "provider": "yfinance",
+  "collection_time": "2026-09-05T09:06:12.966669+00:00",
+  "requested_start": "2025-01-01",
+  "requested_end_exclusive": "2026-01-01",
+  "price_basis": "Yahoo adjusted daily close; prior close is previous adjusted observation",
+  "fundamentals": "Collection-time snapshot, not historical daily fundamentals",
+  "downloaded": {
+    "RELIANCE.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "TCS.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "HDFCBANK.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "ICICIBANK.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "INFY.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "HINDUNILVR.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "ITC.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "SBIN.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "BHARTIARTL.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "BAJFINANCE.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "KOTAKBANK.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "LT.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "AXISBANK.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "ASIANPAINT.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "MARUTI.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "TITAN.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "SUNPHARMA.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "ULTRACEMCO.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "NESTLEIND.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "WIPRO.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "ONGC.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "NTPC.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "POWERGRID.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "M&M.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "TATASTEEL.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "JSWSTEEL.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "ADANIENT.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "ADANIPORTS.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "COALINDIA.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "TMCV.NS": {
+      "rows": 34,
+      "first_date": "2025-11-13T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "BAJAJFINSV.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "HCLTECH.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "DRREDDY.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "CIPLA.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "GRASIM.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "BRITANNIA.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "EICHERMOT.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "HEROMOTOCO.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "DIVISLAB.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "APOLLOHOSP.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "SBILIFE.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "HDFCLIFE.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "INDUSINDBK.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "BPCL.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "TECHM.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "UPL.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "SHREECEM.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "BAJAJ-AUTO.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "HINDALCO.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "TATACONSUM.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "ETERNAL.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "IRCTC.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "DMART.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "LTM.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "PERSISTENT.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "COFORGE.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    },
+    "SHRIRAMFIN.NS": {
+      "rows": 248,
+      "first_date": "2025-01-02T00:00:00+00:00",
+      "last_date": "2025-12-31T00:00:00+00:00"
+    }
+  },
+  "retained_prior_captures": [],
+  "runtime": "Offline replay only; no yfinance calls from startup, API or worker"
+}

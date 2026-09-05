@@ -1,6 +1,6 @@
-"""Fresh market ingestion worker.
+"""Historical market ingestion worker.
 
-Fetches the latest Yahoo Finance market observations periodically and
+Replays saved historical JSON observations periodically and
 persists them through the existing ingestion service.
 
 Run:
@@ -17,13 +17,13 @@ from sqlalchemy import select, text
 from app.db import AsyncSessionLocal, engine
 from app.models import Instrument
 from app.services.ingestion import ingest_observation
-from app.services.providers.indian_stock_market import IndianStockMarketProvider
+from app.services.providers.simulated import SimulatedMarketProvider
 
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_SECONDS = int(
-    os.environ.get("FRESH_INGESTION_INTERVAL_SECONDS", "300")
+    os.environ.get("SIMULATION_INTERVAL_SECONDS", "30")
 )
 
 DATABASE_RETRY_SECONDS = int(
@@ -61,7 +61,7 @@ async def get_instrument_tickers() -> list[str]:
         return list(result.scalars().all())
 
 
-async def ingest_cycle(provider: IndianStockMarketProvider) -> None:
+async def ingest_cycle(provider: SimulatedMarketProvider) -> None:
     """Run one complete market-data ingestion cycle."""
 
     tickers = await get_instrument_tickers()
@@ -71,7 +71,7 @@ async def ingest_cycle(provider: IndianStockMarketProvider) -> None:
         return
 
     logger.info(
-        "Starting fresh market ingestion for %s instruments",
+        "Starting historical market ingestion for %s instruments",
         len(tickers),
     )
 
@@ -138,7 +138,7 @@ async def ingest_cycle(provider: IndianStockMarketProvider) -> None:
     ).total_seconds()
 
     logger.info(
-        "Fresh ingestion cycle complete: "
+        "Historical simulation cycle complete: "
         "requested=%s received=%s accepted=%s rejected=%s "
         "events=%s elapsed=%.2fs",
         len(tickers),
@@ -153,10 +153,15 @@ async def ingest_cycle(provider: IndianStockMarketProvider) -> None:
 async def run(interval_seconds: int = DEFAULT_INTERVAL_SECONDS) -> None:
     """Run the fresh ingestion worker continuously."""
 
-    provider = IndianStockMarketProvider()
+    if interval_seconds <= 0:
+        raise ValueError("Simulation interval must be positive")
+
+    provider = SimulatedMarketProvider(os.environ.get(
+        "REPLAY_SCENARIO", "data/scenarios/historical_update_57.json"
+    ))
 
     logger.info(
-        "Starting fresh market ingestion worker "
+        "Starting historical market ingestion worker "
         "(interval=%ss)",
         interval_seconds,
     )
@@ -193,7 +198,7 @@ async def run(interval_seconds: int = DEFAULT_INTERVAL_SECONDS) -> None:
             await asyncio.sleep(sleep_seconds)
 
     except asyncio.CancelledError:
-        logger.info("Fresh ingestion worker shutting down")
+        logger.info("Historical simulation worker shutting down")
         raise
 
     finally:
@@ -208,7 +213,7 @@ def main() -> None:
 
     interval_seconds = int(
         os.environ.get(
-            "FRESH_INGESTION_INTERVAL_SECONDS",
+            "SIMULATION_INTERVAL_SECONDS",
             str(DEFAULT_INTERVAL_SECONDS),
         )
     )

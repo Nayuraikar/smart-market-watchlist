@@ -22,11 +22,13 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/watchlist
       MARKET_STALE_THRESHOLD_SECONDS: 600
-      FRESH_INGESTION_INTERVAL_SECONDS: 300
+      SIMULATION_INTERVAL_SECONDS: ${SIMULATION_INTERVAL_SECONDS:-30}
+      REPLAY_SCENARIO: data/scenarios/historical_update_57.json
       DATABASE_RETRY_SECONDS: 5
       ENV: development
     volumes:
       - ./backend:/app
+      - ./data:/app/data:ro
     depends_on:
       - postgres
 

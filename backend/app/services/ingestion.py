@@ -49,7 +49,7 @@ def check_timestamp(obs: MarketObservation) -> IngestResult | None:
 
 
 def compute_sequence(obs: MarketObservation) -> int:
-    """No native sequence from yfinance — derive a monotonic integer from
+    """No native sequence in scenario data — derive a monotonic integer from
     the observation's own timestamp. Documented deviation; see DECISIONS.md."""
     return int(obs.observed_at.timestamp())
 

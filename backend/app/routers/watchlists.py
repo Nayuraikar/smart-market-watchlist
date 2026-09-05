@@ -114,6 +114,7 @@ async def get_watchlist(
             "than the watchlist's stored one. Not persisted."
         ),
     ),
+    since: datetime | None = Query(default=None, description="Stable session comparison boundary"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -144,12 +145,16 @@ async def get_watchlist(
         current_user,
     )
 
+    if since is not None and (since.tzinfo is None or since > datetime.now(timezone.utc)):
+        raise HTTPException(status_code=400, detail="since must be a past timezone-aware timestamp")
+
     effective_objective = objective or watchlist.objective
 
     scored_events = await get_scored_events_since_last_visit(
         db,
         watchlist_id,
         effective_objective,
+        since=since,
     )
 
     # Build every explanation once.
@@ -214,7 +219,7 @@ async def get_watchlist(
     return WatchlistSinceLastVisitOut(
         watchlist_id=watchlist.id,
         objective=effective_objective,
-        last_viewed_at=watchlist.last_viewed_at,
+        last_viewed_at=since if since is not None else watchlist.last_viewed_at,
         since_last_visit=SinceLastVisit(
             meaningful_change_count=len(flat_explanations),
             events=flat_explanations,

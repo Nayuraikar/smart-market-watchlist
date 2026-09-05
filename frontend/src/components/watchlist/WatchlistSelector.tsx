@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Bookmark } from 'lucide-react';
 import { WatchlistOut } from '../../types/watchlist';
 
 interface WatchlistSelectorProps {
@@ -19,7 +19,8 @@ export default function WatchlistSelector({ watchlists, currentId }: WatchlistSe
       <label htmlFor="watchlist-select" className="sr-only">
         Switch active watchlist
       </label>
-      <div className="relative">
+      <div className="relative flex items-center">
+        <Bookmark className="pointer-events-none absolute left-3 w-3.5 h-3.5 text-emerald-600 z-10" aria-hidden="true" />
         <select
           id="watchlist-select"
           value={currentId || ''}
@@ -30,13 +31,13 @@ export default function WatchlistSelector({ watchlists, currentId }: WatchlistSe
             }
           }}
           className="
-            appearance-none bg-slate-100 border border-slate-300 text-slate-800 
-            text-sm font-semibold rounded-lg 
-            pl-3 pr-9 py-2
-            cursor-pointer
-            hover:bg-slate-200 hover:border-slate-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            transition-colors
+            appearance-none bg-white border border-slate-200 text-slate-900
+            text-xs font-bold rounded-xl
+            pl-8 pr-8 py-2
+            cursor-pointer shadow-sm
+            hover:border-emerald-300 hover:bg-slate-50/50
+            focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
+            transition-all
           "
           aria-label={`Active watchlist: ${current?.name || 'Select a watchlist'}`}
         >
@@ -48,7 +49,7 @@ export default function WatchlistSelector({ watchlists, currentId }: WatchlistSe
           ))}
         </select>
         <ChevronDown
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"
+          className="pointer-events-none absolute right-2.5 w-3.5 h-3.5 text-slate-400"
           aria-hidden="true"
         />
       </div>

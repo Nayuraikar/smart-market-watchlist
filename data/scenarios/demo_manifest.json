@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "classification": "SYNTHETIC_DEMO_NOT_ACTUAL_MARKET_HISTORY",
+  "generator": "scripts/generate_demo_data.py",
+  "catalog": "data/demo_catalog.json",
+  "tickers": 57,
+  "observations_per_ticker": 180,
+  "baseline_observations": 120,
+  "replay_observations": 60,
+  "start_date": "2025-12-29",
+  "end_date": "2026-09-04",
+  "calendar": "Weekdays only; exchange holidays are not modeled.",
+  "units": {
+    "price": "INR",
+    "market_cap": "INR",
+    "volume": "shares",
+    "pe_ratio": "multiple",
+    "dividend_yield": "percentage points (0.46 means 0.46%)"
+  },
+  "provenance": "Price/volume anchors from existing saved historical_update_57.json. All generated prices, volumes and fundamentals are synthetic illustrative values. No market API is called.",
+  "runtime": "Replay JSON in order with current timestamps; repeat 60-row timeline at EOF. Restart begins at row zero. Loop transitions are simulated, not actual market events."
+}

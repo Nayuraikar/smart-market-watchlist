@@ -1,3 +1,13 @@
+# Final submission data decision
+
+Use yfinance solely for one-time historical collection, then persist JSON and replay it offline through normal ingestion. Default data is the real historical scenarios. Retain synthetic files only as separately labeled test/demo alternatives. Never fill missing historical fundamentals with invented values. This supersedes earlier synthetic-default and no-collector decisions below.
+
+# Current market data policy
+
+The default demo now uses a separately generated, explicitly synthetic 57-stock dataset: 120 baseline plus 60 replay observations per stock, with complete metrics and a price chart. The generator is offline and deterministic. See data/README.md and demo_manifest.json. Older captured historical scenarios remain preserved as inputs/fixtures.
+
+Historical JSON replay is the only market data source. The periodic worker simulates database updates from saved observations; live providers, network metadata backfill, and the downloader have been removed. Earlier provider decisions below are superseded.
+
 ## Market Data Provider
 
 Originally planned: 0xramm/Indian-Stock-Market-API (http://65.0.104.9/).

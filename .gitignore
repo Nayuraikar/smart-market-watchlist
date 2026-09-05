@@ -6,4 +6,21 @@ dist/
 *.pyc
 .DS_Store
 
+# Editor
+.vscode/
+.idea/
+
+# Test / dev artefacts
+.pytest_cache/
+*.sql
+*.bak
+
+# aider session files
 .aider*
+
+# Local environment variants and build metadata
+.env.*
+!.env.example
+*.tsbuildinfo
+.coverage
+htmlcov/

@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db, get_current_user
 from app.models import User, Watchlist, Instrument, WatchlistItem
 from app.schemas.watchlist import StockAdd, StockOut
-from app.schemas.instrument_detail import CurrentMarketData, InstrumentDetailOut
-from app.models import MarketEvent, MarketState
+from app.schemas.instrument_detail import CurrentMarketData, InstrumentDetailOut, PriceHistoryPoint
+from app.models import MarketEvent, MarketState, MarketHistory
 from app.services.explanation import build_explanation
 from app.services.last_visit import score_events_for_watchlist
 from app.services.event_persistence import market_event_to_change_event, LegacyEventNotConvertible
@@ -151,6 +151,12 @@ async def get_stock_detail(
         for scored in scored_events
     ]
 
+    history_result = await db.execute(
+        select(MarketHistory).where(MarketHistory.instrument_id == instrument_id)
+        .order_by(MarketHistory.timestamp.desc(), MarketHistory.id.desc()).limit(180)
+    )
+    history_rows = list(reversed(history_result.scalars().all()))
+
     return InstrumentDetailOut(
         instrument_id=instrument.id,
         ticker=instrument.ticker,
@@ -159,6 +165,8 @@ async def get_stock_detail(
         objective=effective_objective,
         current_data=current_data,
         events=explanations,
+        price_history=[PriceHistoryPoint(timestamp=row.timestamp, price=row.close_price, volume=row.volume)
+                       for row in history_rows],
     )
 
 
