@@ -24,32 +24,82 @@ The UI, watchlists, charts, objective explanations, session behavior and metric 
 
 ## What works
 
-- Register, log in, and manage persistent watchlists.
-- Search the offline stock catalog by ticker or company name.
-- Replay rising prices, pullbacks, quiet periods, and volume changes into PostgreSQL.
-- View price, previous close and volume, plus market cap, P/E and dividend yield wherever the saved source provides them.
-- Explore price history with 30/90/180-observation charts and a keyboard-accessible scrubber.
-- Detect price moves of **2% or more** and rank them with explanations under three investment objectives.
-- Preserve a server-side last-visit boundary, with a stable comparison window during the browser login session.
-- Refresh market pages every five seconds while the simulation advances every 30 seconds.
+* Register, log in, and manage persistent watchlists.
+* Search the offline stock catalog by ticker or company name.
+* Replay rising prices, pullbacks, quiet periods, and volume changes into PostgreSQL.
+* View price, previous close and volume, plus market cap, P/E and dividend yield wherever the saved source provides them.
+* Explore price history with 30/90/180-observation charts and a keyboard-accessible scrubber.
+* Detect price moves of **2% or more** and rank them with explanations under three investment objectives.
+* Preserve a server-side last-visit boundary, with a stable comparison window during the browser login session.
+* Refresh market pages every five seconds while the simulation advances every 30 seconds.
 
 Volume, benchmark-relative and 52-week detection functions have unit coverage, but the ingestion worker currently emits **price-move events only**. A price update below 2% intentionally produces no event.
 
 ## Run locally
 
-Prerequisites: Docker with Compose, Node.js 20+ with npm, Bash and curl. Python 3.12 is needed only for local backend development or regenerating the data.
+Prerequisites:
+
+* Docker Desktop with Docker Compose
+* Node.js 20+ with npm
+* Git
+* Bash and curl
+* Python 3.12 only for local backend development or regenerating the historical data
+
+Docker Desktop handles PostgreSQL and the backend containers. Node.js is used for the frontend.
+
+### Install Docker Desktop
+
+Download Docker Desktop from:
+
+https://www.docker.com/products/docker-desktop/
+
+After installation, open Docker Desktop and wait until the Docker engine is running.
+
+Verify Docker:
+
+```bash
+docker --version
+docker compose version
+```
+
+Both commands should print version information.
+
+### Install Node.js
+
+Download Node.js 20 or newer from:
+
+https://nodejs.org/
+
+Verify it:
+
+```bash
+node --version
+npm --version
+```
+
+### Clone the repository
 
 ```bash
 git clone https://github.com/Nayuraikar/smart-market-watchlist.git
 cd smart-market-watchlist
+```
+
+### macOS / Linux
+
+Make sure Docker Desktop or the Docker engine is running.
+
+Then run:
+
+```bash
 ./start.sh
 ```
 
-Open **http://localhost:5173**. Register an account, create a watchlist and add stocks such as RELIANCE, TCS and INFY. API documentation is at **http://localhost:8000/docs**.
+If the script is not executable:
 
-Startup builds the backend, applies migrations, seeds offline company names, loads the saved historical baseline and update scenario for every stock, then starts the repeating simulation and frontend. The initial update timestamps are rebased to the current time. The frontend opens automatically on macOS.
-
-**Restarting `start.sh` resets demo market state, market history, events and visit boundaries. Users, watchlists and tracked stocks are preserved.** Ctrl+C stops the processes/services this invocation starts; services already running may remain up.
+```bash
+chmod +x start.sh
+./start.sh
+```
 
 For a faster walkthrough:
 
@@ -57,16 +107,83 @@ For a faster walkthrough:
 SIMULATION_INTERVAL_SECONDS=5 ./start.sh
 ```
 
+### Windows
+
+The project startup script is written in Bash, so the easiest Windows setup is to use **Git Bash**.
+
+Install Git for Windows from:
+
+https://git-scm.com/download/win
+
+During installation, Git Bash is included automatically.
+
+Then:
+
+1. Open Docker Desktop and wait until Docker is running.
+2. Open the `smart-market-watchlist` folder.
+3. Right-click inside the folder and choose **Open Git Bash here**.
+4. Run:
+
+```bash
+./start.sh
+```
+
+For a faster walkthrough:
+
+```bash
+SIMULATION_INTERVAL_SECONDS=5 ./start.sh
+```
+
+If Git Bash reports a permission issue, run:
+
+```bash
+bash start.sh
+```
+
+The script should then execute through Bash without requiring Unix executable permissions.
+
+### What startup does
+
+Startup:
+
+* starts PostgreSQL and the backend with Docker Compose
+* applies database migrations
+* ensures the instrument catalog exists
+* resets demo market state
+* loads the saved historical baseline
+* loads the saved historical update scenario
+* rebases the update timestamps to the current time
+* starts the repeating simulation
+* starts the frontend
+
+The first run may take longer because Docker may need to download images and build containers.
+
+Open **http://localhost:5173**.
+
+Register an account, create a watchlist and add stocks such as RELIANCE, TCS and INFY.
+
+API documentation is at **http://localhost:8000/docs**.
+
+Startup builds the backend, applies migrations, seeds offline company names, loads the saved historical baseline and update scenario for every stock, then starts the repeating simulation and frontend. The initial update timestamps are rebased to the current time. The frontend opens automatically on macOS.
+
+**Restarting `start.sh` resets demo market state, market history, events and visit boundaries. Users, watchlists and tracked stocks are preserved.** Ctrl+C stops the processes/services this invocation starts; services already running may remain up.
+
 The saved update sequence repeats at the configured pace. A worker restart begins at its first row. Real historical price moves determine when events occur; no price jumps are manufactured. A newly added stock only contributes events after tracking begins, so allow subsequent ticks before expecting its change feed to fill.
+
+To stop all Compose services manually:
+
+```bash
+docker compose down
+```
 
 ## Saved data and reproducibility
 
-- `data/scenarios/historical_baseline_57.json`: genuine captured historical baseline.
-- `data/scenarios/historical_update_57.json`: genuine historical timeline replayed periodically.
-- `data/scenarios/historical_manifest.json`: coverage/provenance from the latest successful collection, when present.
-- `backend/scripts/collect_historical_data.py`: isolated optional yfinance collector.
-- `data/demo_catalog.json`: company names/sectors; its synthetic financial assumptions are not used by historical replay.
-- `demo_*.json` and `scripts/generate_demo_data.py`: retained, explicitly synthetic alternative fixtures, **not the default**.
+* `data/scenarios/historical_baseline_57.json`: genuine captured historical baseline.
+* `data/scenarios/historical_update_57.json`: genuine historical timeline replayed periodically.
+* `data/scenarios/historical_manifest.json`: coverage/provenance from the latest successful collection, when present.
+* `backend/scripts/collect_historical_data.py`: isolated optional yfinance collector.
+* `data/demo_catalog.json`: company names/sectors; its synthetic financial assumptions are not used by historical replay.
+* `demo_*.json` and `scripts/generate_demo_data.py`: retained, explicitly synthetic alternative fixtures, **not the default**.
 
 The collector uses adjusted daily closing prices to reduce artificial jumps caused by splits. The existing older captures retain their original source basis. Historical candles do not contain daily historical P/E, market cap or dividend yield; the app labels absent fields rather than substituting fake numbers. Optional fundamentals snapshots record collection-time values. See [data/README.md](data/README.md).
 
@@ -118,22 +235,23 @@ docker compose config --quiet
 
 For a host Python environment, install `backend/requirements.txt`, export `DATABASE_URL` using `localhost:5432` and a `JWT_SECRET`, then run Alembic and pytest from `backend` with `PYTHONPATH=.`. The tests create and clean their fixtures; do not point the suite at an important database.
 
-GitHub Actions runs dataset reproducibility, migrations, all backend tests against a fresh PostgreSQL service, frontend lint/build, and startup/Compose syntax checks. Dependencies require internet during installation; **market-data ingestion does not**.
-
 ## Configuration and troubleshooting
 
-| Setting | Default / behavior |
-|---|---|
-| `SIMULATION_INTERVAL_SECONDS` | 30; positive integer, exported to Compose by startup |
-| `REPLAY_SCENARIO` | `data/scenarios/historical_update_57.json` in the worker service |
-| `DATABASE_URL` | Local demo PostgreSQL; set explicitly for host development/tests |
-| `JWT_SECRET` | Compose has a local-development placeholder; configure a private value for deployment |
-| `VITE_API_BASE_URL` | See `frontend/src/api/client.ts`; frontend defaults to localhost API |
+| Setting                       | Default / behavior                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------- |
+| `SIMULATION_INTERVAL_SECONDS` | 30; positive integer, exported to Compose by startup                                  |
+| `REPLAY_SCENARIO`             | `data/scenarios/historical_update_57.json` in the worker service                      |
+| `DATABASE_URL`                | Local demo PostgreSQL; set explicitly for host development/tests                      |
+| `JWT_SECRET`                  | Compose has a local-development placeholder; configure a private value for deployment |
+| `VITE_API_BASE_URL`           | See `frontend/src/api/client.ts`; frontend defaults to localhost API                  |
 
-- **No events yet:** confirm tracked stocks, wait for a ≥2% tick, and check `docker compose logs --tail 20 market-ingestion`. Small changes should not become signals.
-- **Old values after data edits:** restart the worker with `docker compose restart market-ingestion`. To replace the entire history, rerun `start.sh` (market reset described above).
-- **Ports in use:** the demo uses 5173, 8000 and 5432. Adminer is optional on 8080.
-- **Data badges:** “Fresh” describes the simulated observation timestamp, not a live quote. Event badges capture quality at event time.
+* **Docker is not running:** open Docker Desktop and wait until the engine starts before running the startup script.
+* **Docker command not found:** install Docker Desktop and reopen the terminal.
+* **Windows `./start.sh` does not run:** use Git Bash and run `bash start.sh`.
+* **No events yet:** confirm tracked stocks, wait for a ≥2% tick, and check `docker compose logs --tail 20 market-ingestion`. Small changes should not become signals.
+* **Old values after data edits:** restart the worker with `docker compose restart market-ingestion`. To replace the entire history, rerun `start.sh` (market reset described above).
+* **Ports in use:** the demo uses 5173, 8000 and 5432. Adminer is optional on 8080.
+* **Data badges:** “Fresh” describes the simulated observation timestamp, not a live quote. Event badges capture quality at event time.
 
 ## Repository contents
 
@@ -144,8 +262,52 @@ backend/tests/           Unit and database/API regression tests
 frontend/src/            Watchlists, metrics, charts and session behavior
 data/                    Saved demo catalog, scenarios and provenance
 scripts/                 Offline reproducible dataset generator
-.github/workflows/       Automated GitHub checks
+demo/                    Standalone interactive walkthrough
 start.sh                 Complete local demo startup
 ```
 
 This repository is a local demo, not a production deployment. The development credentials and ports in Compose are intentional local defaults. `.env`, caches, build output and editor histories are excluded from Git. Older design documents retain historical decisions and future detector plans; the README and data guide describe the current demo behavior.
+
+## Interactive Demo
+
+For a guided walkthrough of the product and engineering architecture, open:
+
+[`demo/index.html`](demo/index.html)
+
+directly in your browser.
+
+No Docker, database, backend or build process is required for the interactive demo.
+
+### macOS
+
+From the repository root:
+
+```bash
+open demo/index.html
+```
+
+### Windows
+
+Open the `demo` folder and double-click:
+
+```text
+index.html
+```
+
+Alternatively, right-click `index.html` and open it with Chrome, Edge or another browser.
+
+The interactive demo uses illustrative data and does not replace the actual running application.
+
+For the real application:
+
+macOS/Linux:
+
+```bash
+./start.sh
+```
+
+Windows using Git Bash:
+
+```bash
+bash start.sh
+```

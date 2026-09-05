@@ -12,3 +12,16 @@ Historical collection is separate: yfinance downloads past data once, stores JSO
 Newly added stocks only contribute events after tracking begins. Startup resets market state/history/events and visit boundaries while preserving accounts and watchlists. The periodic worker loops its saved timeline; a worker restart begins at row zero. Fresh refers to simulation timestamps, not live exchange quotes.
 
 See PRODUCT_PITCH.md for the required 100-word pitch and SUBMISSION.md for requirement coverage. README.md contains setup, tests and collection commands.
+
+## Interactive Product Tour
+
+Before the live demo, optionally open `demo/index.html`.
+
+Use it to explain:
+1. Product thesis
+2. Meaningful changes
+3. Personalization
+4. Since-last-visit behavior
+5. Engineering architecture
+
+Then launch the actual application with `./start.sh`.
