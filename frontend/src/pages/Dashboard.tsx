@@ -8,9 +8,9 @@ import ErrorState from '../components/feedback/ErrorState';
 import { PlusCircle, List, ArrowRight, TrendingUp, DollarSign, Shield } from 'lucide-react';
 
 const OBJECTIVE_LABELS: Record<Objective, { label: string; description: string; icon: typeof TrendingUp }> = {
-  GROWTH: { label: 'Growth', description: 'Revenue, earnings & momentum', icon: TrendingUp },
-  VALUE: { label: 'Value', description: 'Fundamentals, multiples & yield', icon: DollarSign },
-  STABILITY: { label: 'Stability', description: 'Low volatility & strong balance sheets', icon: Shield },
+  GROWTH: { label: 'Growth', description: 'Revenue, earnings & capital efficiency', icon: TrendingUp },
+  VALUE: { label: 'Value', description: 'Valuation & free cash flow yield', icon: DollarSign },
+  STABILITY: { label: 'Stability', description: 'Financial resilience & balance sheet strength', icon: Shield },
 };
 
 export default function Dashboard() {
@@ -164,9 +164,9 @@ export default function Dashboard() {
                   transition-shadow
                 "
               >
-                <option value="GROWTH">Growth — revenue, earnings &amp; momentum</option>
-                <option value="VALUE">Value — fundamentals, multiples &amp; yield</option>
-                <option value="STABILITY">Stability — low volatility &amp; balance sheet strength</option>
+                <option value="GROWTH">Growth — revenue, earnings &amp; capital efficiency</option>
+                <option value="VALUE">Value — valuation &amp; free cash flow yield</option>
+                <option value="STABILITY">Stability — financial resilience &amp; balance sheet strength</option>
               </select>
             </div>
 
