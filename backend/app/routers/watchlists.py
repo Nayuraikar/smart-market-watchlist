@@ -109,7 +109,6 @@ async def get_watchlist(
     watchlist_id: UUID,
     objective: str | None = Query(
         default=None,
-        pattern="^(GROWTH|VALUE|STABILITY)$",
         description=(
             "Optional: score this read under a different objective "
             "than the watchlist's stored one. Not persisted."
@@ -126,6 +125,18 @@ async def get_watchlist(
     Phase 7.5 provides POST /watchlists/{watchlist_id}/viewed
     as the only endpoint that advances last_viewed_at.
     """
+
+    if objective is not None and objective not in {"GROWTH", "VALUE", "STABILITY"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": {
+                    "code": "INVALID_OBJECTIVE",
+                    "message": "objective must be one of GROWTH, VALUE, STABILITY",
+                    "request_id": None,
+                }
+            },
+        )
 
     watchlist = await _get_owned_watchlist(
         db,

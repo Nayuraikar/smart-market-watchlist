@@ -1,0 +1,24 @@
+{
+  "RELIANCE.NS": [
+    {
+      "price": 1404.00,
+      "previous_close": 1300.50,
+      "volume": 18000000,
+      "market_cap": null,
+      "pe_ratio": 25.1,
+      "dividend_yield": 0.4,
+      "observed_at": "2026-09-05T04:20:00+00:00",
+      "source": "replay"
+    },
+    {
+      "price": 1500.00,
+      "previous_close": 1404.00,
+      "volume": 22000000,
+      "market_cap": null,
+      "pe_ratio": 25.5,
+      "dividend_yield": 0.4,
+      "observed_at": "2026-09-05T04:25:00+00:00",
+      "source": "replay"
+    }
+  ]
+}

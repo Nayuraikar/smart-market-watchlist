@@ -1075,6 +1075,59 @@ async def test_explanation_not_implemented_propagates_as_500(
         await db.commit()
 
 
+# ---- 10b. invalid objective returns 400, not 422, and does not persist ---
+
+@pytest.mark.asyncio
+async def test_get_returns_400_for_invalid_objective(
+    client,
+    db,
+    make_user,
+):
+    user, token = await make_user()
+
+    watchlist = await _mk_watchlist(
+        db,
+        user,
+        objective="GROWTH",
+    )
+
+    await db.commit()
+
+    try:
+        response = await client.get(
+            f"/watchlists/{watchlist.id}",
+            params={"objective": "NOT_A_REAL_OBJECTIVE"},
+            headers=_auth(token),
+        )
+
+        assert response.status_code == 400
+
+        body = response.json()
+
+        assert body["error"]["code"] == "INVALID_OBJECTIVE"
+
+        result = await db.execute(
+            select(Watchlist).where(
+                Watchlist.id == watchlist.id
+            )
+        )
+
+        reloaded = result.scalar_one()
+
+        # Objective override is transient — an invalid attempt
+        # must not mutate the persisted objective either.
+        assert reloaded.objective == "GROWTH"
+
+    finally:
+        await db.execute(
+            delete(Watchlist).where(
+                Watchlist.id == watchlist.id
+            )
+        )
+
+        await db.commit()
+
+
 # ============================================================================
 # PHASE 7.5
 # POST /watchlists/{watchlist_id}/viewed

@@ -16,6 +16,20 @@ services:
     depends_on:
       - postgres
 
+  market-ingestion:
+    build: ./backend
+    command: python -m app.workers.fresh_ingestion
+    environment:
+      DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/watchlist
+      MARKET_STALE_THRESHOLD_SECONDS: 600
+      FRESH_INGESTION_INTERVAL_SECONDS: 300
+      DATABASE_RETRY_SECONDS: 5
+      ENV: development
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+
   postgres:
     image: postgres:16
     environment:

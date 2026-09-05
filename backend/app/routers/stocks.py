@@ -7,6 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db, get_current_user
 from app.models import User, Watchlist, Instrument, WatchlistItem
 from app.schemas.watchlist import StockAdd, StockOut
+from app.schemas.instrument_detail import CurrentMarketData, InstrumentDetailOut
+from app.models import MarketEvent, MarketState
+from app.services.explanation import build_explanation
+from app.services.last_visit import score_events_for_watchlist
+from app.services.event_persistence import market_event_to_change_event, LegacyEventNotConvertible
+from app.services.intelligence import Objective
 
 router = APIRouter(prefix="/watchlists/{watchlist_id}/stocks", tags=["stocks"])
 
@@ -66,6 +72,94 @@ async def list_stocks(
         )
         for instrument, added_at in rows
     ]
+
+
+@router.get("/{instrument_id}", response_model=InstrumentDetailOut)
+async def get_stock_detail(
+    watchlist_id: UUID,
+    instrument_id: UUID,
+    objective: Objective | None = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    watchlist = await _get_owned_watchlist(db, watchlist_id, current_user)
+
+    membership = await db.execute(
+        select(WatchlistItem, Instrument).join(
+            Instrument,
+            Instrument.id == WatchlistItem.instrument_id,
+        ).where(
+            WatchlistItem.watchlist_id == watchlist_id,
+            WatchlistItem.instrument_id == instrument_id,
+        )
+    )
+    row = membership.one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "NOT_FOUND", "message": "Instrument not found in this watchlist", "request_id": None}},
+        )
+
+    item, instrument = row
+    state_result = await db.execute(
+        select(MarketState).where(MarketState.instrument_id == instrument_id)
+    )
+    market_state = state_result.scalar_one_or_none()
+
+    current_data = None
+    if market_state is not None:
+        data_status = {
+            "state": market_state.data_quality,
+            "message": (
+                "This is the last known market state and may not reflect the most recent activity."
+                if market_state.data_quality == "STALE"
+                else "Market data is unavailable."
+                if market_state.data_quality == "UNAVAILABLE"
+                else None
+            ),
+        }
+        current_data = CurrentMarketData(
+            price=market_state.price if market_state.data_quality != "UNAVAILABLE" else None,
+            previous_close=market_state.previous_close if market_state.data_quality != "UNAVAILABLE" else None,
+            volume=market_state.volume if market_state.data_quality != "UNAVAILABLE" else None,
+            market_cap=market_state.market_cap if market_state.data_quality != "UNAVAILABLE" else None,
+            pe_ratio=market_state.pe_ratio if market_state.data_quality != "UNAVAILABLE" else None,
+            dividend_yield=market_state.dividend_yield if market_state.data_quality != "UNAVAILABLE" else None,
+            observed_at=market_state.observed_at,
+            data_status=data_status,
+        )
+
+    events_result = await db.execute(
+        select(MarketEvent).where(
+            MarketEvent.instrument_id == instrument_id,
+            MarketEvent.timestamp > item.added_at,
+        ).order_by(MarketEvent.timestamp.desc())
+    )
+    event_rows = events_result.scalars().all()
+    convertible_events = []
+    for event_row in event_rows:
+        try:
+            market_event_to_change_event(event_row)
+            convertible_events.append(event_row)
+        except LegacyEventNotConvertible:
+            continue
+
+    effective_objective = objective or watchlist.objective
+    scored_events = score_events_for_watchlist(convertible_events, effective_objective)
+    explanations = [
+        build_explanation(scored, effective_objective)
+        for scored in scored_events
+    ]
+
+    return InstrumentDetailOut(
+        instrument_id=instrument.id,
+        ticker=instrument.ticker,
+        name=instrument.name,
+        exchange=instrument.exchange,
+        objective=effective_objective,
+        current_data=current_data,
+        events=explanations,
+    )
 
 
 @router.post("", response_model=StockOut, status_code=status.HTTP_201_CREATED)

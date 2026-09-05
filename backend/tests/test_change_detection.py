@@ -9,7 +9,7 @@ from app.services.change_detection import (
 )
 
 NOW = datetime(2026, 9, 5, 12, 0, 0, tzinfo=timezone.utc)
-FIXTURE_PATH = Path(__file__).parent.parent.parent / "data" / "scenarios" / "phase6_market_history.json"
+FIXTURE_PATH = Path(__file__).parent.parent / "data" / "scenarios" / "phase6_market_history.json"
 
 
 def _load_fixture():
